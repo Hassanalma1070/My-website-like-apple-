@@ -14,7 +14,7 @@ const origins = (process.env.CORS_ORIGIN || "*").split(",").map((o) => o.trim())
 app.use(cors({ origin: origins.includes("*") ? true : origins }));
 app.use(express.json());
 
-const spec = buildSpec(PORT);
+const spec = buildSpec();
 app.use("/swagger", swaggerUi.serve, swaggerUi.setup(spec, { customSiteTitle: "Customer API" }));
 app.get("/swagger.json", (req, res) => res.json(spec));
 
@@ -40,7 +40,12 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: "Internal server error" });
 });
 
-app.listen(PORT, () => {
-  console.log(`API running at http://localhost:${PORT}`);
-  console.log(`Swagger UI at http://localhost:${PORT}/swagger`);
-});
+// On Vercel the app is exported and run as a serverless function instead of listening on a port
+if (!process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`API running at http://localhost:${PORT}`);
+    console.log(`Swagger UI at http://localhost:${PORT}/swagger`);
+  });
+}
+
+export default app;

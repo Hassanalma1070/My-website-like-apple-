@@ -26,7 +26,7 @@ const idParam = { name: "id", in: "path", required: true, schema: { type: "integ
 const notFound = { description: "Customer not found", ...json(ref("Error")) };
 const badRequest = { description: "Invalid input", ...json(ref("Error")) };
 
-export function buildSpec(port) {
+export function buildSpec() {
   return {
     openapi: "3.0.3",
     info: {
@@ -35,7 +35,7 @@ export function buildSpec(port) {
       description:
         "CRUD operations on the `customer` table, plus an agent endpoint that answers natural-language questions about customers using Claude. No authentication is required.",
     },
-    servers: [{ url: `http://localhost:${port}` }],
+    servers: [{ url: "/" }],
     tags: [
       { name: "Customers", description: "CRUD operations on customers" },
       { name: "Agent", description: "Natural-language assistant backed by Claude" },
