@@ -115,6 +115,15 @@ const notFound = { description: "Customer not found, or owned by another user", 
 const badRequest = { description: "Invalid input", ...json(ref("Error")) };
 const unauthorized = { description: "Missing, invalid or expired token", ...json(ref("Error")) };
 const duplicateEmail = { description: "A customer with this email already exists", ...json(ref("Error")) };
+const exportCategory = {
+  type: "object",
+  properties: {
+    key: { type: "string", example: "customers" },
+    name: { type: "string", example: "Customers", description: "Also the worksheet name" },
+    filters: { type: "array", items: { type: "string" }, example: ["q", "from", "to"], description: "Filters this category accepts" },
+  },
+};
+
 const salesOnly = { description: "Admin accounts cannot use this endpoint", ...json(ref("Error")) };
 const secured = { security: [{ bearerAuth: [] }] };
 
@@ -123,7 +132,7 @@ export function buildSpec() {
     openapi: "3.0.3",
     info: {
       title: "Customer API",
-      version: "2.2.0",
+      version: "2.3.0",
       description: [
         "CRUD operations on customers, plus an agent endpoint that answers natural-language questions about customers using Claude.",
         "",
@@ -138,6 +147,8 @@ export function buildSpec() {
         "**Password reset:** `POST /api/auth/forgot-password` creates a single-use link that expires in 30 minutes. No email provider is configured yet, so during development the link is printed in the backend console (`npm run reset-link -- <email>` also prints one). Copy the `reset_token` value from the link into `POST /api/auth/reset-password`. Changing or resetting a password signs out every older token.",
         "",
         "**Admin:** admins sign in on `POST /api/admin/login` (the sales login refuses them). Create the default admin with `npm run seed-admin`, log in, click **Authorize** and call `GET /api/admin/users`. Admin tokens get `403` on the Customers and Agent endpoints, and sales tokens get `403` on the Admin endpoints.",
+        "",
+        "**Export to Excel:** `GET /api/export/categories` lists what you can export (sales users: `customers`; admins: `sales_users`). `GET /api/export?categories=all` downloads an `.xlsx` workbook with one sheet per category; Swagger shows a download link. At most 100,000 rows per export.",
       ].join("\n"),
     },
     servers: [{ url: "/" }],
@@ -146,6 +157,7 @@ export function buildSpec() {
       { name: "Customers", description: "CRUD operations on customers" },
       { name: "Agent", description: "Natural-language assistant backed by Claude" },
       { name: "Admin", description: "Admin login and the sales users dashboard" },
+      { name: "Export", description: "Download data as an Excel workbook, one sheet per category" },
       { name: "Health" },
     ],
     components: {
@@ -168,6 +180,7 @@ export function buildSpec() {
         AdminSalesUser: adminSalesUser,
         AdminSummary: adminSummary,
         AdminUsersResponse: adminUsersResponse,
+        ExportCategory: exportCategory,
       },
     },
     paths: {
@@ -346,6 +359,44 @@ export function buildSpec() {
             200: { description: "Sales users and totals", ...json(ref("AdminUsersResponse")) },
             401: unauthorized,
             403: { description: "Only admins can use this endpoint", ...json(ref("Error")) },
+          },
+        },
+      },
+      "/api/export/categories": {
+        get: {
+          tags: ["Export"],
+          summary: "List the categories you can export",
+          ...secured,
+          responses: {
+            200: { description: "Categories for your role", ...json({ type: "array", items: ref("ExportCategory") }) },
+            401: unauthorized,
+          },
+        },
+      },
+      "/api/export": {
+        get: {
+          tags: ["Export"],
+          summary: "Download an Excel workbook (one sheet per category)",
+          ...secured,
+          description:
+            "Exports only data you can view. Dates are written in the time zone given by `tz`. Every export is logged (user, time, categories, filters, row count).",
+          parameters: [
+            { name: "categories", in: "query", required: true, schema: { type: "string" }, example: "all", description: "Comma-separated category keys, or `all` for every category you can export" },
+            { name: "q", in: "query", schema: { type: "string", maxLength: 200 }, description: "Customers only: case-insensitive match on name, email, phone or ID (like the customers screen search)" },
+            { name: "from", in: "query", schema: { type: "string", format: "date" }, description: "Created/joined on or after this date (inclusive)" },
+            { name: "to", in: "query", schema: { type: "string", format: "date" }, description: "Created/joined on or before this date (inclusive)" },
+            { name: "tz", in: "query", schema: { type: "string" }, example: "UTC", description: "IANA time zone for dates and the file name; defaults to UTC" },
+          ],
+          responses: {
+            200: {
+              description: "The workbook. The file name is in Content-Disposition, e.g. CustomerHub_All_2026-10-29_1432.xlsx.",
+              headers: { "X-Export-Rows": { description: "Total data rows across all sheets", schema: { type: "integer" } } },
+              content: { "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": { schema: { type: "string", format: "binary" } } },
+            },
+            400: badRequest,
+            401: unauthorized,
+            403: { description: "Your role cannot export one of the requested categories", ...json(ref("Error")) },
+            413: { description: "More than 100,000 rows; narrow the filters", ...json(ref("Error")) },
           },
         },
       },

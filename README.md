@@ -47,6 +47,8 @@ All customer and agent endpoints need an `Authorization: Bearer <token>` header 
 | POST | `/api/agent/chat` | Ask a question in natural language: `{ "message": "Get all customers", "history": [] }` |
 | POST | `/api/admin/login` | Admin login with `{ email, password }`. Returns `{ token, user }`. Sales accounts get `403`. |
 | GET | `/api/admin/users` | Admin only. `{ summary: { sales_users, total_customers }, users: [{ user_id, name, email, created_at, customer_count }] }` for every sales user. |
+| GET | `/api/export/categories` | The categories you can export: `customers` (sales users) or `sales_users` (admins) |
+| GET | `/api/export` | Download an `.xlsx` workbook. Query: `categories` (keys or `all`), optional `q` (customers search), `from` / `to` (`YYYY-MM-DD`), `tz`. `403` for a category your role can't export, `413` above 100,000 rows. |
 | GET | `/api/health` | Health check, including the database connection |
 
 ### Testing auth in Swagger
@@ -75,6 +77,20 @@ Creates the admin `admin@admin.com` with the password `123456789`, or the values
 In the frontend, use the **Admin sign in** link under the sign-in form. In Swagger, call `POST /api/admin/login`, click **Authorize**, then call `GET /api/admin/users`.
 
 The role is read from the database on every request, so changing a user's role takes effect on their existing token right away.
+
+### Export to Excel
+
+Users can export the data they can view to an Excel workbook, one sheet per category:
+
+| Role | Category | Sheet |
+|---|---|---|
+| sales | `customers` | Your customers: ID, name, email, phone (as text), created |
+| admin | `sales_users` | Sales users with joined date and customer count |
+
+- In the app: **Export to Excel** on the customers screen (uses the current search) and on the admin dashboard, and **Export** in the header (choose categories and an optional date range).
+- Headers are bold and frozen, columns are fitted, numbers are numbers and dates are dates in your time zone. File name: `CustomerHub_<Category or All>_<YYYY-MM-DD_HHmm>.xlsx`.
+- At most 100,000 rows per export (`MAX_EXPORT_ROWS` in `src/exports.js`); larger exports get `413`.
+- Every export is logged in the `export_log` table (user, time, categories, filters, row count, status). It is created by `sql/003_export_log.sql`, so run `npm run migrate` after pulling.
 
 ### Agent
 

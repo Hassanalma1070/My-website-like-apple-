@@ -129,6 +129,11 @@ input, textarea { font: inherit; color: inherit; letter-spacing: inherit; }
 .stats-2 { grid-template-columns: repeat(2, 1fr); }
 .hero-compact { padding-bottom: 56px; }
 .toolbar-end { justify-content: flex-end; }
+.export-categories { border: 0; margin: 0; padding: 0; min-width: 0; }
+.export-categories > span { font-weight: 600; font-size: 13px; color: var(--muted); margin-bottom: 4px; }
+.checkbox { display: flex; align-items: center; gap: 10px; font-size: 15px; padding: 4px 0; }
+.checkbox input { width: 18px; height: 18px; accent-color: var(--primary); }
+.export-dates { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .table td.count { font-weight: 600; font-variant-numeric: tabular-nums; }
 
 .section-head { text-align: center; margin-bottom: 32px; scroll-margin-top: 72px; }
@@ -370,4 +375,9 @@ input, textarea { font: inherit; color: inherit; letter-spacing: inherit; }
   .user-menu { gap: 10px; }
   .auth { padding-top: 48px; }
   .auth-card { padding: 28px 20px; }
+  /* Search on its own row; Refresh and Export share the next one */
+  .toolbar { flex-wrap: wrap; }
+  .toolbar .search { flex-basis: 100%; }
+  .toolbar .btn { flex: 1; justify-content: center; }
+  .export-dates { grid-template-columns: 1fr; }
 }

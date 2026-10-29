@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api } from '../api.js'
 import { RefreshIcon } from './Icons.jsx'
+import ExportButton from './ExportButton.jsx'
 
 const formatDate = (value) => (value ? new Date(value).toLocaleDateString(undefined, { dateStyle: 'medium' }) : '—')
 
@@ -8,7 +9,7 @@ const initials = (name) =>
   name.replace(/[^\p{L}\p{N}\s]/gu, '').trim().split(/\s+/).slice(0, 2).map((p) => p[0]?.toUpperCase()).join('')
 
 // Read-only overview for admins: every sales user and how many customers they own
-export default function AdminDashboard() {
+export default function AdminDashboard({ notify, canExport = false }) {
   const [data, setData] = useState(null) // { summary, users }
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -53,6 +54,7 @@ export default function AdminDashboard() {
           <button className="btn btn-ghost" onClick={load} disabled={loading}>
             <RefreshIcon className={loading ? 'spin' : ''} /> Refresh
           </button>
+          {canExport && <ExportButton category="sales_users" notify={notify} />}
         </div>
 
         {error ? (

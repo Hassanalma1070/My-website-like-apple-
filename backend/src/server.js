@@ -8,12 +8,14 @@ import customerRoutes from "./routes/customers.js";
 import agentRoutes from "./routes/agent.js";
 import authRoutes from "./routes/auth.js";
 import adminRoutes from "./routes/admin.js";
+import exportRoutes from "./routes/export.js";
 
 const PORT = Number(process.env.PORT) || 4000;
 const app = express();
 
 const origins = (process.env.CORS_ORIGIN || "*").split(",").map((o) => o.trim());
-app.use(cors({ origin: origins.includes("*") ? true : origins }));
+// Exports send the file name and row count in headers the frontend must be able to read
+app.use(cors({ origin: origins.includes("*") ? true : origins, exposedHeaders: ["Content-Disposition", "X-Export-Rows"] }));
 app.use(express.json());
 
 const spec = buildSpec();
@@ -31,6 +33,7 @@ app.get("/api/health", async (req, res) => {
 
 app.use("/api/auth", authRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api/export", exportRoutes);
 app.use("/api/customers", customerRoutes);
 app.use("/api/agent", agentRoutes);
 

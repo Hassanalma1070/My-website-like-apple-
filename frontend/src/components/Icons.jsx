@@ -40,3 +40,6 @@ export const SparkIcon = (p) => (
 export const XIcon = (p) => (
   <svg {...base} {...p}><path d="M18 6 6 18M6 6l12 12" /></svg>
 )
+export const DownloadIcon = (p) => (
+  <svg {...base} {...p}><path d="M12 3v12M7 10l5 5 5-5M5 21h14" /></svg>
+)
