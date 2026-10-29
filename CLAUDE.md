@@ -9,6 +9,16 @@ Customer Hub: two independent npm projects, each with its own `package.json`, `.
 - `backend/`: Express 5 REST API (ESM, plain JS) on PostgreSQL via `pg`, with Swagger UI and a Claude agent. Port 4000.
 - `frontend/`: React 19 + Vite SPA. Port 5173. Talks to the backend over REST, with no auth.
 
+## Workflow: spec-driven development
+
+This project follows spec-driven development:
+
+1. **Spec:** write the spec for a feature or change in `_specs/` at the repo root, and get the user's approval before planning.
+2. **Plan:** after the spec is approved, write the implementation plan in `_plans/`.
+3. **Implement:** before starting implementation, make sure all changes on the current branch are committed (the working tree must be clean), then implement according to the plan.
+
+Do not skip straight to implementation without an approved spec and a plan.
+
 ## Commands
 
 ```bash
