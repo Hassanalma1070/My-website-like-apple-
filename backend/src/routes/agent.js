@@ -1,11 +1,11 @@
 import { Router } from "express";
 import Anthropic from "@anthropic-ai/sdk";
 import { chat } from "../agent.js";
-import { requireAuth } from "../auth.js";
+import { requireAuth, requireRole } from "../auth.js";
 
 const router = Router();
 
-router.post("/chat", requireAuth, async (req, res, next) => {
+router.post("/chat", requireAuth, requireRole("sales"), async (req, res, next) => {
   const { message, history = [] } = req.body ?? {};
   if (typeof message !== "string" || !message.trim()) {
     return res.status(400).json({ error: "message is required" });

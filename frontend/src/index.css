@@ -126,6 +126,10 @@ input, textarea { font: inherit; color: inherit; letter-spacing: inherit; }
   -webkit-background-clip: text; background-clip: text; color: transparent;
 }
 .stat-label { color: var(--muted); font-size: 15px; }
+.stats-2 { grid-template-columns: repeat(2, 1fr); }
+.hero-compact { padding-bottom: 56px; }
+.toolbar-end { justify-content: flex-end; }
+.table td.count { font-weight: 600; font-variant-numeric: tabular-nums; }
 
 .section-head { text-align: center; margin-bottom: 32px; scroll-margin-top: 72px; }
 .section-head p { margin: 10px 0 0; font-size: 19px; }
@@ -192,6 +196,7 @@ input, textarea { font: inherit; color: inherit; letter-spacing: inherit; }
 
 .alert { padding: 12px 14px; border-radius: 12px; margin: 0; }
 .alert-error { background: var(--danger-soft); color: var(--danger); }
+.alert-success { background: var(--primary-soft); color: var(--text); }
 
 /* Modal & form */
 .modal-backdrop {
@@ -342,6 +347,10 @@ input, textarea { font: inherit; color: inherit; letter-spacing: inherit; }
 .user-name { font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 160px; }
 .user-menu button { color: var(--link); background: none; border: 0; padding: 0; font-size: 12px; }
 .user-menu button:hover { text-decoration: underline; }
+.badge {
+  padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600;
+  background: var(--primary-soft); color: var(--primary);
+}
 .auth { display: flex; justify-content: center; padding: 80px 16px 120px; animation: fadeUp 0.6s ease both; }
 .auth-card {
   width: 100%; max-width: 400px; padding: 36px 32px; border-radius: var(--radius);
@@ -352,9 +361,13 @@ input, textarea { font: inherit; color: inherit; letter-spacing: inherit; }
 .auth-card .btn-primary { margin-top: 4px; width: 100%; }
 .auth-switch { margin: 16px 0 0; text-align: center; }
 .auth-switch .btn-link { padding: 0; border: 0; font-size: inherit; }
+.auth-admin { margin-top: 8px; }
+.field-label-row { display: flex; justify-content: space-between; align-items: baseline; }
+.field-label-row .btn-link { padding: 0; border: 0; font-size: 13px; font-weight: 400; }
 @media (max-width: 640px) {
   .globalnav-links { gap: 16px; }
   .user-name { display: none; }
+  .user-menu { gap: 10px; }
   .auth { padding-top: 48px; }
   .auth-card { padding: 28px 20px; }
 }

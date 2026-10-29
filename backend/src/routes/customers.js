@@ -1,9 +1,10 @@
 import { Router } from "express";
 import * as customers from "../customers.js";
-import { requireAuth } from "../auth.js";
+import { requireAuth, requireRole } from "../auth.js";
 
 const router = Router();
-router.use(requireAuth);
+// Only sales users own customers; admins get 403
+router.use(requireAuth, requireRole("sales"));
 
 function parseId(req, res) {
   const id = Number.parseInt(req.params.id, 10);

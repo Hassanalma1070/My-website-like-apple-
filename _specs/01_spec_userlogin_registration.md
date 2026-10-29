@@ -1,6 +1,6 @@
 # Spec 01: User Registration, Login and Per-User Customer Access
 
-- **Status:** Approved (2026-10-29)
+- **Status:** Done. Implemented and merged in PR #1 (2026-10-29)
 - **Date:** 2026-10-29
 - **Affects:** `backend/` (DB, REST API, agent, Swagger) and `frontend/`
 

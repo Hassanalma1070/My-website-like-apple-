@@ -48,6 +48,28 @@ const authResponse = {
   },
 };
 
+const newPassword = { type: "string", format: "password", minLength: 8, example: "new-password-2" };
+
+const changePasswordInput = {
+  type: "object",
+  required: ["currentPassword", "newPassword"],
+  properties: { currentPassword: { type: "string", format: "password", example: "correct-horse-1" }, newPassword },
+};
+
+const forgotPasswordInput = {
+  type: "object",
+  required: ["email"],
+  properties: { email: { type: "string", example: "sam@example.com" } },
+};
+
+const resetPasswordInput = {
+  type: "object",
+  required: ["token", "newPassword"],
+  properties: { token: { type: "string", description: "The reset_token value from the reset link" }, newPassword },
+};
+
+const message = { type: "object", properties: { message: { type: "string" } } };
+
 const customerInput = {
   type: "object",
   properties: {
@@ -59,6 +81,33 @@ const customerInput = {
 
 const error = { type: "object", properties: { error: { type: "string" } } };
 
+const adminSalesUser = {
+  type: "object",
+  properties: {
+    user_id: { type: "integer", example: 3 },
+    name: { type: "string", example: "Sam Seller" },
+    email: { type: "string", example: "sam@example.com" },
+    created_at: { type: "string", format: "date-time" },
+    customer_count: { type: "integer", example: 11, description: "Customers owned by this sales user" },
+  },
+};
+
+const adminSummary = {
+  type: "object",
+  properties: {
+    sales_users: { type: "integer", example: 3 },
+    total_customers: { type: "integer", example: 27 },
+  },
+};
+
+const adminUsersResponse = {
+  type: "object",
+  properties: {
+    summary: { $ref: "#/components/schemas/AdminSummary" },
+    users: { type: "array", items: { $ref: "#/components/schemas/AdminSalesUser" } },
+  },
+};
+
 const json = (schema) => ({ content: { "application/json": { schema } } });
 const ref = (name) => ({ $ref: `#/components/schemas/${name}` });
 const idParam = { name: "id", in: "path", required: true, schema: { type: "integer" }, description: "customer_id" };
@@ -66,6 +115,7 @@ const notFound = { description: "Customer not found, or owned by another user", 
 const badRequest = { description: "Invalid input", ...json(ref("Error")) };
 const unauthorized = { description: "Missing, invalid or expired token", ...json(ref("Error")) };
 const duplicateEmail = { description: "A customer with this email already exists", ...json(ref("Error")) };
+const salesOnly = { description: "Admin accounts cannot use this endpoint", ...json(ref("Error")) };
 const secured = { security: [{ bearerAuth: [] }] };
 
 export function buildSpec() {
@@ -73,7 +123,7 @@ export function buildSpec() {
     openapi: "3.0.3",
     info: {
       title: "Customer API",
-      version: "2.0.0",
+      version: "2.2.0",
       description: [
         "CRUD operations on customers, plus an agent endpoint that answers natural-language questions about customers using Claude.",
         "",
@@ -84,6 +134,10 @@ export function buildSpec() {
         "2. Click **Authorize** and paste the token.",
         "3. Call the Customers and Agent endpoints.",
         "4. To check access control, register a second user, authorize as them, and try to read or change the first user's customers.",
+        "",
+        "**Password reset:** `POST /api/auth/forgot-password` creates a single-use link that expires in 30 minutes. No email provider is configured yet, so during development the link is printed in the backend console (`npm run reset-link -- <email>` also prints one). Copy the `reset_token` value from the link into `POST /api/auth/reset-password`. Changing or resetting a password signs out every older token.",
+        "",
+        "**Admin:** admins sign in on `POST /api/admin/login` (the sales login refuses them). Create the default admin with `npm run seed-admin`, log in, click **Authorize** and call `GET /api/admin/users`. Admin tokens get `403` on the Customers and Agent endpoints, and sales tokens get `403` on the Admin endpoints.",
       ].join("\n"),
     },
     servers: [{ url: "/" }],
@@ -91,6 +145,7 @@ export function buildSpec() {
       { name: "Auth", description: "Register, log in and get the current user" },
       { name: "Customers", description: "CRUD operations on customers" },
       { name: "Agent", description: "Natural-language assistant backed by Claude" },
+      { name: "Admin", description: "Admin login and the sales users dashboard" },
       { name: "Health" },
     ],
     components: {
@@ -102,10 +157,17 @@ export function buildSpec() {
         RegisterInput: registerInput,
         LoginInput: loginInput,
         AuthResponse: authResponse,
+        ChangePasswordInput: changePasswordInput,
+        ForgotPasswordInput: forgotPasswordInput,
+        ResetPasswordInput: resetPasswordInput,
+        Message: message,
         Customer: customer,
         CustomerInput: { ...customerInput, required: ["name"] },
         CustomerUpdate: customerInput,
         Error: error,
+        AdminSalesUser: adminSalesUser,
+        AdminSummary: adminSummary,
+        AdminUsersResponse: adminUsersResponse,
       },
     },
     paths: {
@@ -124,12 +186,13 @@ export function buildSpec() {
       "/api/auth/login": {
         post: {
           tags: ["Auth"],
-          summary: "Log in and get a token",
+          summary: "Log in as a sales user and get a token",
           requestBody: { required: true, ...json(ref("LoginInput")) },
           responses: {
             200: { description: "Logged in", ...json(ref("AuthResponse")) },
             400: badRequest,
             401: { description: "Invalid email or password", ...json(ref("Error")) },
+            403: { description: "Admin accounts must use POST /api/admin/login", ...json(ref("Error")) },
           },
         },
       },
@@ -141,6 +204,40 @@ export function buildSpec() {
           responses: { 200: { description: "The current user", ...json(ref("User")) }, 401: unauthorized },
         },
       },
+      "/api/auth/change-password": {
+        post: {
+          tags: ["Auth"],
+          summary: "Change your password (signs out your other sessions)",
+          ...secured,
+          description: "Returns a new token. Every token issued before the change, including the one used for this call, stops working.",
+          requestBody: { required: true, ...json(ref("ChangePasswordInput")) },
+          responses: {
+            200: { description: "Password changed", ...json(ref("AuthResponse")) },
+            400: badRequest,
+            401: { description: "Current password is incorrect, or the token is missing or invalid", ...json(ref("Error")) },
+          },
+        },
+      },
+      "/api/auth/forgot-password": {
+        post: {
+          tags: ["Auth"],
+          summary: "Request a password reset link",
+          description: "Always returns 202 with the same message, whether or not the email is registered. At most 3 links per user per hour.",
+          requestBody: { required: true, ...json(ref("ForgotPasswordInput")) },
+          responses: { 202: { description: "Request accepted", ...json(ref("Message")) }, 400: badRequest },
+        },
+      },
+      "/api/auth/reset-password": {
+        post: {
+          tags: ["Auth"],
+          summary: "Set a new password with a reset token",
+          requestBody: { required: true, ...json(ref("ResetPasswordInput")) },
+          responses: {
+            200: { description: "Password reset; sign in with the new password", ...json(ref("Message")) },
+            400: { description: "Invalid input, or the token is invalid, expired or already used", ...json(ref("Error")) },
+          },
+        },
+      },
       "/api/customers": {
         get: {
           tags: ["Customers"],
@@ -149,14 +246,14 @@ export function buildSpec() {
           parameters: [
             { name: "name", in: "query", required: false, schema: { type: "string" }, description: "Case-insensitive partial match on name" },
           ],
-          responses: { 200: { description: "Your customers", ...json({ type: "array", items: ref("Customer") }) }, 401: unauthorized },
+          responses: { 200: { description: "Your customers", ...json({ type: "array", items: ref("Customer") }) }, 401: unauthorized, 403: salesOnly },
         },
         post: {
           tags: ["Customers"],
           summary: "Create a customer owned by you",
           ...secured,
           requestBody: { required: true, ...json(ref("CustomerInput")) },
-          responses: { 201: { description: "Created", ...json(ref("Customer")) }, 400: badRequest, 401: unauthorized, 409: duplicateEmail },
+          responses: { 201: { description: "Created", ...json(ref("Customer")) }, 400: badRequest, 401: unauthorized, 403: salesOnly, 409: duplicateEmail },
         },
       },
       "/api/customers/{id}": {
@@ -165,7 +262,7 @@ export function buildSpec() {
           summary: "Get one of your customers by id",
           ...secured,
           parameters: [idParam],
-          responses: { 200: { description: "The customer", ...json(ref("Customer")) }, 401: unauthorized, 404: notFound },
+          responses: { 200: { description: "The customer", ...json(ref("Customer")) }, 401: unauthorized, 403: salesOnly, 404: notFound },
         },
         put: {
           tags: ["Customers"],
@@ -173,14 +270,14 @@ export function buildSpec() {
           ...secured,
           parameters: [idParam],
           requestBody: { required: true, ...json(ref("CustomerUpdate")) },
-          responses: { 200: { description: "Updated", ...json(ref("Customer")) }, 400: badRequest, 401: unauthorized, 404: notFound, 409: duplicateEmail },
+          responses: { 200: { description: "Updated", ...json(ref("Customer")) }, 400: badRequest, 401: unauthorized, 403: salesOnly, 404: notFound, 409: duplicateEmail },
         },
         delete: {
           tags: ["Customers"],
           summary: "Delete one of your customers",
           ...secured,
           parameters: [idParam],
-          responses: { 200: { description: "The deleted customer", ...json(ref("Customer")) }, 401: unauthorized, 404: notFound },
+          responses: { 200: { description: "The deleted customer", ...json(ref("Customer")) }, 401: unauthorized, 403: salesOnly, 404: notFound },
         },
       },
       "/api/agent/chat": {
@@ -223,6 +320,32 @@ export function buildSpec() {
             },
             400: badRequest,
             401: unauthorized,
+            403: salesOnly,
+          },
+        },
+      },
+      "/api/admin/login": {
+        post: {
+          tags: ["Admin"],
+          summary: "Log in as an admin and get a token",
+          requestBody: { required: true, ...json(ref("LoginInput")) },
+          responses: {
+            200: { description: "Logged in as admin", ...json(ref("AuthResponse")) },
+            400: badRequest,
+            401: { description: "Invalid email or password", ...json(ref("Error")) },
+            403: { description: "The account is not an admin", ...json(ref("Error")) },
+          },
+        },
+      },
+      "/api/admin/users": {
+        get: {
+          tags: ["Admin"],
+          summary: "List sales users with the number of customers each one owns",
+          ...secured,
+          responses: {
+            200: { description: "Sales users and totals", ...json(ref("AdminUsersResponse")) },
+            401: unauthorized,
+            403: { description: "Only admins can use this endpoint", ...json(ref("Error")) },
           },
         },
       },

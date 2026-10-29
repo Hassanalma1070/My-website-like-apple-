@@ -3,6 +3,9 @@ import { api } from './api.js'
 import CustomersView from './components/CustomersView.jsx'
 import ChatWidget from './components/ChatWidget.jsx'
 import AuthView from './components/AuthView.jsx'
+import ResetPasswordView from './components/ResetPasswordView.jsx'
+import ChangePasswordDialog from './components/ChangePasswordDialog.jsx'
+import AdminDashboard from './components/AdminDashboard.jsx'
 import { clearSession, loadSession, saveSession } from './session.js'
 
 function initialSession() {
@@ -11,12 +14,27 @@ function initialSession() {
   return session
 }
 
+const readResetToken = () => new URLSearchParams(window.location.search).get('reset_token')
+
+// Remove ?reset_token=... so the one-time token doesn't stay in the address bar or history
+function clearResetToken() {
+  const url = new URL(window.location.href)
+  url.searchParams.delete('reset_token')
+  window.history.replaceState(null, '', url)
+}
+
 export default function App() {
   const [refreshKey, setRefreshKey] = useState(0)
   const [toasts, setToasts] = useState([])
   const [status, setStatus] = useState('checking') // checking | online | offline
   const [chatOpen, setChatOpen] = useState(false)
   const [session, setSession] = useState(initialSession)
+  const [resetToken, setResetToken] = useState(readResetToken)
+  const [authNotice, setAuthNotice] = useState('')
+  const [changingPassword, setChangingPassword] = useState(false)
+  // Admins only get the dashboard; the customers screen and the assistant are for sales users
+  const isAdmin = session?.user.role === 'admin'
+  const isSales = session && !isAdmin
 
   useEffect(() => {
     api.health().then(() => setStatus('online')).catch(() => setStatus('offline'))
@@ -39,7 +57,27 @@ export default function App() {
     clearSession()
     setSession(null)
     setChatOpen(false)
+    setChangingPassword(false)
   }, [])
+
+  // A reset signs out every session, so return to sign-in with a confirmation
+  const finishReset = useCallback((message) => {
+    clearResetToken()
+    setResetToken(null)
+    logout()
+    setAuthNotice(message)
+  }, [logout])
+
+  const cancelReset = useCallback(() => {
+    clearResetToken()
+    setResetToken(null)
+  }, [])
+
+  const handlePasswordChanged = useCallback((next) => {
+    handleAuthenticated(next)
+    setChangingPassword(false)
+    notify('Password changed. Your other devices have been signed out.')
+  }, [handleAuthenticated, notify])
 
   // Any 401 from a protected endpoint (expired or invalid token) signs the user out
   useEffect(() => {
@@ -56,8 +94,8 @@ export default function App() {
         <div className="globalnav-inner">
           <span className="brand">Customer Hub</span>
           <div className="globalnav-links">
-            {session && <a href="#customers">Customers</a>}
-            {session && <button type="button" onClick={() => setChatOpen(true)}>Assistant</button>}
+            {isSales && <a href="#customers">Customers</a>}
+            {isSales && <button type="button" onClick={() => setChatOpen(true)}>Assistant</button>}
             <a href={`${api.baseUrl}/swagger`} target="_blank" rel="noreferrer">Developers</a>
           </div>
           <div className="globalnav-end">
@@ -65,9 +103,11 @@ export default function App() {
               <span className={`status-dot ${status}`} />
               <span>{status === 'checking' ? 'Checking' : status === 'online' ? 'Online' : 'Offline'}</span>
             </span>
-            {session && (
+            {session && !resetToken && (
               <span className="user-menu">
                 <span className="user-name" title={session.user.email}>{session.user.name}</span>
+                {isAdmin && <span className="badge">Admin</span>}
+                <button type="button" onClick={() => setChangingPassword(true)}>Change password</button>
                 <button type="button" onClick={logout}>Log out</button>
               </span>
             )}
@@ -76,11 +116,16 @@ export default function App() {
       </nav>
 
       <main className="main">
-        {session ? (
+        {resetToken ? (
+          <ResetPasswordView token={resetToken} onDone={finishReset} onCancel={cancelReset} />
+        ) : isAdmin ? (
+          <AdminDashboard key={session.user.user_id} />
+        ) : session ? (
           // Keyed by user so switching accounts starts with fresh customer data
           <CustomersView key={session.user.user_id} notify={notify} refreshKey={refreshKey} onAsk={() => setChatOpen(true)} />
         ) : (
-          <AuthView onAuthenticated={handleAuthenticated} />
+          // Keyed by the notice so a new confirmation message resets the form
+          <AuthView key={authNotice} notice={authNotice} onAuthenticated={handleAuthenticated} />
         )}
       </main>
 
@@ -91,7 +136,11 @@ export default function App() {
         </div>
       </footer>
 
-      {session && (
+      {changingPassword && (
+        <ChangePasswordDialog onChanged={handlePasswordChanged} onClose={() => setChangingPassword(false)} />
+      )}
+
+      {isSales && !resetToken && (
         // Keyed by user so logging out or switching accounts clears the conversation
         <ChatWidget
           key={session.user.user_id}
