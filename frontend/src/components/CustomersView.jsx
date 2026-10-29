@@ -3,6 +3,7 @@ import { api } from '../api.js'
 import CustomerForm from './CustomerForm.jsx'
 import Modal from './Modal.jsx'
 import HeroIllustration from './HeroIllustration.jsx'
+import ExportButton from './ExportButton.jsx'
 import { EditIcon, PlusIcon, RefreshIcon, SearchIcon, TrashIcon } from './Icons.jsx'
 
 const formatDate = (value) =>
@@ -11,7 +12,7 @@ const formatDate = (value) =>
 const initials = (name) =>
   name.replace(/[^\p{L}\p{N}\s]/gu, '').trim().split(/\s+/).slice(0, 2).map((p) => p[0]?.toUpperCase()).join('')
 
-export default function CustomersView({ notify, refreshKey, onAsk }) {
+export default function CustomersView({ notify, refreshKey, onAsk, canExport = false }) {
   const [customers, setCustomers] = useState([])
   const [loading, setLoading] = useState(true)
   const [loadedAt, setLoadedAt] = useState(0)
@@ -119,6 +120,8 @@ export default function CustomersView({ notify, refreshKey, onAsk }) {
           <button className="btn btn-ghost" onClick={load} disabled={loading}>
             <RefreshIcon className={loading ? 'spin' : ''} /> Refresh
           </button>
+          {/* Sends the search text, so the file holds the rows shown below */}
+          {canExport && <ExportButton category="customers" filters={{ q: query.trim() }} notify={notify} />}
         </div>
 
         {error ? (
