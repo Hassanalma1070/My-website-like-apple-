@@ -2,19 +2,40 @@ import Anthropic from "@anthropic-ai/sdk";
 import { betaZodTool } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { z } from "zod";
 import * as customers from "./customers.js";
+import * as deals from "./deals.js";
+import { STAGES, validateDealInput } from "./dealValidation.js";
 import { getUserById } from "./users.js";
 
 const client = new Anthropic(); // reads ANTHROPIC_API_KEY from the environment
 const MODEL = process.env.ANTHROPIC_MODEL || "claude-opus-5-5";
 
 const systemPrompt = (user) => `You are a customer-data assistant for an internal sales dashboard.
+Today's date is ${new Date().toISOString().slice(0, 10)}.
 You are assisting the sales person ${user.name}. You can only see and manage this sales person's own customers.
 If a customer is not found, say so; do not speculate about customers that belong to other users.
 You answer questions about the customer table and can create, update and delete customers using the provided tools.
 Always use the tools to read data. Never invent customers or fields.
 The customer fields are customer_id, name, email, phone and created_at.
 When a request is ambiguous (for example, several customers match a name for an update or delete), list the matches and ask which one the user means.
+Customers can have deals: sales opportunities with a title, an amount in Indian rupees (₹), a stage and an optional expected close date.
+The stages, in pipeline order, are lead, qualified, proposal, then won or lost. Lead, qualified and proposal are open; won and lost are closed.
+To add a deal for a customer named by the user, look the customer up first to get its customer_id. Dates are YYYY-MM-DD; a date without a year means the next such date from today.
+Show amounts in rupees with Indian digit grouping, for example ₹1,50,000.
 Keep answers short. Use Markdown tables when showing more than one customer.`;
+
+const dealFields = {
+  title: z.string().min(1).max(200),
+  amount: z.number().nonnegative().describe("Amount in Indian rupees, at most 2 decimals"),
+  stage: z.enum(STAGES),
+  expected_close_date: z.string().describe("YYYY-MM-DD").nullable(),
+};
+
+// Validates with the same rules as the REST API; throws so the tool returns { error }
+function dealInput(input, create) {
+  const { fields, error } = validateDealInput(input, { create });
+  if (error) throw new Error(error);
+  return fields;
+}
 
 // Tools are built per request so each call can record which tools ran and is bound to the
 // logged-in user. The user id comes from this closure and is never a tool input, so the
@@ -80,6 +101,55 @@ function buildTools(toolCalls, userId) {
       description: "Permanently delete a customer by customer_id. Only call this when the user clearly asked to delete that specific customer.",
       inputSchema: z.object({ customer_id: z.number().int().positive() }),
       run: ({ customer_id }) => customers.deleteCustomer(userId, customer_id),
+    }),
+    tool({
+      name: "get_deals",
+      description: "Return deals, optionally filtered by stage (a stage, or open / closed) and customer_id, with pipeline totals.",
+      inputSchema: z.object({
+        stage: z.enum(["open", "closed", ...STAGES]).optional(),
+        customer_id: z.number().int().positive().optional(),
+      }),
+      run: async ({ stage, customer_id }) => {
+        const filters = { stage, customerId: customer_id };
+        const [list, summary] = await Promise.all([deals.listDeals(userId, filters), deals.dealSummary(userId, filters, "UTC")]);
+        return { deals: list, summary };
+      },
+    }),
+    tool({
+      name: "get_customer_deals",
+      description: "Return all deals for one customer by customer_id.",
+      inputSchema: z.object({ customer_id: z.number().int().positive() }),
+      run: ({ customer_id }) => deals.listCustomerDeals(userId, customer_id),
+    }),
+    tool({
+      name: "add_deal",
+      description: "Create a deal for a customer. stage defaults to lead; expected_close_date is optional.",
+      inputSchema: z.object({
+        customer_id: z.number().int().positive(),
+        title: dealFields.title,
+        amount: dealFields.amount,
+        stage: dealFields.stage.optional(),
+        expected_close_date: dealFields.expected_close_date.optional(),
+      }),
+      run: (input) => deals.createDeal(userId, dealInput(input, true)),
+    }),
+    tool({
+      name: "update_deal",
+      description: "Update the title, amount, stage or expected close date of a deal. Only the provided fields change; null clears the close date.",
+      inputSchema: z.object({
+        deal_id: z.number().int().positive(),
+        title: dealFields.title.optional(),
+        amount: dealFields.amount.optional(),
+        stage: dealFields.stage.optional(),
+        expected_close_date: dealFields.expected_close_date.optional(),
+      }),
+      run: ({ deal_id, ...fields }) => deals.updateDeal(userId, deal_id, dealInput(fields, false)),
+    }),
+    tool({
+      name: "delete_deal",
+      description: "Permanently delete a deal by deal_id. Only call this when the user clearly asked to delete that specific deal.",
+      inputSchema: z.object({ deal_id: z.number().int().positive() }),
+      run: ({ deal_id }) => deals.deleteDeal(userId, deal_id),
     }),
   ];
 }

@@ -7,6 +7,56 @@ const customer = {
     phone: { type: "string", nullable: true, example: "5551234567" },
     created_at: { type: "string", format: "date-time" },
     sales_user_id: { type: "integer", readOnly: true, example: 3, description: "The sales person who owns this customer" },
+    open_deals: { type: "integer", readOnly: true, example: 2, description: "Open deals (lead, qualified, proposal). Only in the customers list." },
+    open_amount: { type: "string", readOnly: true, example: "240000.00", description: "Total of open deals in rupees. Only in the customers list." },
+    total_deals: { type: "integer", readOnly: true, example: 3, description: "All deals, including won and lost. Only in the customers list." },
+  },
+};
+
+const stageEnum = ["lead", "qualified", "proposal", "won", "lost"];
+
+const deal = {
+  type: "object",
+  properties: {
+    deal_id: { type: "integer", example: 5 },
+    customer_id: { type: "integer", example: 12 },
+    customer_name: { type: "string", example: "Sunrise Hospital" },
+    title: { type: "string", example: "Brochure printing – Q4" },
+    amount: { type: "string", example: "150000.00", description: "Indian rupees, two decimals, as a string" },
+    stage: { type: "string", enum: stageEnum, example: "lead" },
+    expected_close_date: { type: "string", format: "date", nullable: true, example: "2026-11-30" },
+    created_at: { type: "string", format: "date-time" },
+    updated_at: { type: "string", format: "date-time" },
+  },
+};
+
+const dealFields = {
+  title: { type: "string", maxLength: 200, example: "Brochure printing – Q4" },
+  amount: { oneOf: [{ type: "number" }, { type: "string" }], example: 150000, description: "Rupees, at least 0, at most 2 decimals" },
+  stage: { type: "string", enum: stageEnum, example: "lead" },
+  expected_close_date: { type: "string", format: "date", nullable: true, example: "2026-11-30" },
+};
+
+const dealInput = {
+  type: "object",
+  required: ["customer_id", "title", "amount"],
+  properties: { customer_id: { type: "integer", example: 12 }, ...dealFields },
+};
+
+const dealUpdate = {
+  type: "object",
+  description: "Only the fields you send change. customer_id cannot be changed.",
+  properties: { ...dealFields, stage: { ...dealFields.stage, example: "qualified" } },
+};
+
+const totals = { type: "object", properties: { count: { type: "integer" }, amount: { type: "string", example: "150000.00" } } };
+
+const dealSummary = {
+  type: "object",
+  properties: {
+    by_stage: { type: "object", properties: Object.fromEntries(stageEnum.map((s) => [s, totals])) },
+    open: totals,
+    won_this_month: { ...totals, description: "Won deals last updated this calendar month, in the tz time zone" },
   },
 };
 
@@ -124,6 +174,7 @@ const exportCategory = {
   },
 };
 
+const dealNotFound = { description: "Deal not found, or owned by another user", ...json({ $ref: "#/components/schemas/Error" }) };
 const salesOnly = { description: "Admin accounts cannot use this endpoint", ...json(ref("Error")) };
 const secured = { security: [{ bearerAuth: [] }] };
 
@@ -132,7 +183,7 @@ export function buildSpec() {
     openapi: "3.0.3",
     info: {
       title: "Customer API",
-      version: "2.3.0",
+      version: "2.4.0",
       description: [
         "CRUD operations on customers, plus an agent endpoint that answers natural-language questions about customers using Claude.",
         "",
@@ -148,7 +199,7 @@ export function buildSpec() {
         "",
         "**Admin:** admins sign in on `POST /api/admin/login` (the sales login refuses them). Create the default admin with `npm run seed-admin`, log in, click **Authorize** and call `GET /api/admin/users`. Admin tokens get `403` on the Customers and Agent endpoints, and sales tokens get `403` on the Admin endpoints.",
         "",
-        "**Export to Excel:** `GET /api/export/categories` lists what you can export (sales users: `customers`; admins: `sales_users`). `GET /api/export?categories=all` downloads an `.xlsx` workbook with one sheet per category; Swagger shows a download link. At most 100,000 rows per export.",
+        "**Export to Excel:** `GET /api/export/categories` lists what you can export (sales users: `customers` and `deals`; admins: `sales_users`). `GET /api/export?categories=all` downloads an `.xlsx` workbook with one sheet per category; Swagger shows a download link. At most 100,000 rows per export.",
       ].join("\n"),
     },
     servers: [{ url: "/" }],
@@ -157,6 +208,7 @@ export function buildSpec() {
       { name: "Customers", description: "CRUD operations on customers" },
       { name: "Agent", description: "Natural-language assistant backed by Claude" },
       { name: "Admin", description: "Admin login and the sales users dashboard" },
+      { name: "Deals", description: "Sales opportunities for your customers (sales users only)" },
       { name: "Export", description: "Download data as an Excel workbook, one sheet per category" },
       { name: "Health" },
     ],
@@ -181,6 +233,11 @@ export function buildSpec() {
         AdminSummary: adminSummary,
         AdminUsersResponse: adminUsersResponse,
         ExportCategory: exportCategory,
+        Deal: deal,
+        DealInput: dealInput,
+        DealUpdate: dealUpdate,
+        DealSummary: dealSummary,
+        DealListResponse: { type: "object", properties: { deals: { type: "array", items: ref("Deal") }, summary: ref("DealSummary") } },
       },
     },
     paths: {
@@ -291,6 +348,66 @@ export function buildSpec() {
           ...secured,
           parameters: [idParam],
           responses: { 200: { description: "The deleted customer", ...json(ref("Customer")) }, 401: unauthorized, 403: salesOnly, 404: notFound },
+        },
+      },
+      "/api/customers/{id}/deals": {
+        get: {
+          tags: ["Deals"],
+          summary: "Get the deals of one of your customers",
+          ...secured,
+          parameters: [idParam],
+          responses: { 200: { description: "The customer's deals", ...json({ type: "array", items: ref("Deal") }) }, 401: unauthorized, 403: salesOnly, 404: notFound },
+        },
+      },
+      "/api/deals": {
+        get: {
+          tags: ["Deals"],
+          summary: "List your deals with pipeline totals",
+          ...secured,
+          parameters: [
+            { name: "stage", in: "query", schema: { type: "string", enum: ["open", "closed", ...stageEnum] }, description: "A stage, or open / closed" },
+            { name: "customer_id", in: "query", schema: { type: "integer" } },
+            { name: "q", in: "query", schema: { type: "string" }, description: "Title contains (case-insensitive)" },
+            { name: "tz", in: "query", schema: { type: "string" }, example: "Asia/Kolkata", description: "Time zone for 'won this month'; defaults to UTC" },
+          ],
+          responses: { 200: { description: "Deals sorted by expected close date, and totals", ...json(ref("DealListResponse")) }, 400: badRequest, 401: unauthorized, 403: salesOnly },
+        },
+        post: {
+          tags: ["Deals"],
+          summary: "Create a deal for one of your customers",
+          ...secured,
+          requestBody: { required: true, ...json(ref("DealInput")) },
+          responses: {
+            201: { description: "Created", ...json(ref("Deal")) },
+            400: badRequest,
+            401: unauthorized,
+            403: salesOnly,
+            404: { description: "Customer not found, or owned by another user", ...json(ref("Error")) },
+          },
+        },
+      },
+      "/api/deals/{id}": {
+        get: {
+          tags: ["Deals"],
+          summary: "Get one of your deals",
+          ...secured,
+          parameters: [{ ...idParam, description: "deal_id" }],
+          responses: { 200: { description: "The deal", ...json(ref("Deal")) }, 401: unauthorized, 403: salesOnly, 404: dealNotFound },
+        },
+        put: {
+          tags: ["Deals"],
+          summary: "Update one of your deals (only provided fields change)",
+          ...secured,
+          parameters: [{ ...idParam, description: "deal_id" }],
+          requestBody: { required: true, ...json(ref("DealUpdate")) },
+          responses: { 200: { description: "Updated", ...json(ref("Deal")) }, 400: badRequest, 401: unauthorized, 403: salesOnly, 404: dealNotFound },
+        },
+        delete: {
+          tags: ["Deals"],
+          summary: "Delete one of your deals",
+          ...secured,
+          parameters: [{ ...idParam, description: "deal_id" }],
+          responses: { 200: { description: "The deleted deal", ...json(ref("Deal")) }, 401: unauthorized, 403: salesOnly, 404: dealNotFound },
         },
       },
       "/api/agent/chat": {

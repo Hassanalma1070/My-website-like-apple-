@@ -1,5 +1,24 @@
-// SQL fragments for export filters. Each helper appends its values to params and returns
-// a condition (or "TRUE"), so callers can AND them into their own per-user WHERE clause.
+// Filter helpers shared by exports and lists. The SQL helpers append their values to params and
+// return a condition (or "TRUE"), so callers can AND them into their own per-user WHERE clause.
+
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+// A real calendar date in YYYY-MM-DD (rejects 2026-02-30)
+export function validDate(value) {
+  if (typeof value !== "string" || !DATE_RE.test(value)) return false;
+  const date = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}
+
+export function validTimeZone(tz) {
+  if (typeof tz !== "string" || !tz) return false;
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: tz });
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 // from/to are inclusive YYYY-MM-DD dates in the user's time zone
 export function dateRange(column, { from, to, tz }, params) {

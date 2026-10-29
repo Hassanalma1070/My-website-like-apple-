@@ -1,13 +1,16 @@
 import ExcelJS from "exceljs";
 import { countCustomersForExport, listCustomersForExport } from "./customers.js";
 import { countSalesUsersForExport, listSalesUsersForExport } from "./admin.js";
+import { countDealsForExport, listDealsForExport } from "./deals.js";
+import { validDate, validTimeZone } from "./exportFilters.js";
 
 export const MAX_EXPORT_ROWS = 100_000;
 export const XLSX_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
 const DATE_FORMAT = "yyyy-mm-dd hh:mm";
+const DATE_ONLY_FORMAT = "yyyy-mm-dd";
+const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 const MAX_Q = 200;
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 // Exportable categories, in sheet order. A role may export exactly the categories it can view;
 // each category's data functions apply the same access rules as the screens.
@@ -29,6 +32,25 @@ const CATEGORIES = [
     rows: (user, filters) => listCustomersForExport(user.user_id, filters),
   },
   {
+    key: "deals",
+    name: "Deals",
+    fileName: "Deals",
+    role: "sales",
+    filters: ["from", "to"],
+    columns: [
+      { header: "Deal ID", key: "deal_id", type: "number", numFmt: "0" },
+      { header: "Customer", key: "customer_name", type: "text" },
+      { header: "Title", key: "title", type: "text" },
+      { header: "Amount", key: "amount", type: "number", numFmt: '"₹"#,##,##0.00' },
+      { header: "Stage", key: "stage", type: "text", format: capitalize },
+      { header: "Expected close", key: "expected_close_date", type: "dateOnly" },
+      { header: "Created", key: "created_at", type: "date" },
+      { header: "Updated", key: "updated_at", type: "date" },
+    ],
+    count: (user, filters) => countDealsForExport(user.user_id, filters),
+    rows: (user, filters) => listDealsForExport(user.user_id, filters),
+  },
+  {
     key: "sales_users",
     name: "Sales users",
     fileName: "SalesUsers",
@@ -47,23 +69,6 @@ const CATEGORIES = [
 ];
 
 export const categoriesFor = (role) => CATEGORIES.filter((c) => c.role === role);
-
-function validTimeZone(tz) {
-  if (typeof tz !== "string" || !tz) return false;
-  try {
-    new Intl.DateTimeFormat("en-US", { timeZone: tz });
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-// A real calendar date in YYYY-MM-DD (rejects 2026-02-30)
-function validDate(value) {
-  if (!DATE_RE.test(value)) return false;
-  const date = new Date(`${value}T00:00:00Z`);
-  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
-}
 
 // Returns { categories, all, filters } or { status, error }; all is true for categories=all
 export function parseExportRequest(query, role) {
@@ -130,10 +135,14 @@ function cellValue(column, value, tz) {
   if (value === null || value === undefined) return null;
   if (column.type === "number") return Number(value);
   if (column.type === "date") return zonedDate(new Date(value), tz);
-  return String(value); // text stays text, so phone numbers keep leading zeros
+  // "YYYY-MM-DD" with no time: UTC midnight, so no time-zone shift moves the day
+  if (column.type === "dateOnly") return new Date(`${value}T00:00:00Z`);
+  // text stays text, so phone numbers keep leading zeros
+  return column.format ? column.format(String(value)) : String(value);
 }
 
-const displayLength = (column, value) => (column.type === "date" ? DATE_FORMAT.length : String(value ?? "").length);
+const displayLength = (column, value) =>
+  column.type === "date" ? DATE_FORMAT.length : column.type === "dateOnly" ? DATE_ONLY_FORMAT.length : String(value ?? "").length;
 
 // Longest value or header in each column, between 8 and 60 characters
 export function columnWidths(columns, rows) {
@@ -154,7 +163,7 @@ export async function writeWorkbook(stream, sheets, tz) {
       header: c.header,
       key: c.key,
       width: widths[i],
-      style: c.type === "date" ? { numFmt: DATE_FORMAT } : c.numFmt ? { numFmt: c.numFmt } : {},
+      style: c.type === "date" ? { numFmt: DATE_FORMAT } : c.type === "dateOnly" ? { numFmt: DATE_ONLY_FORMAT } : c.numFmt ? { numFmt: c.numFmt } : {},
     }));
     sheet.getRow(1).font = { bold: true };
     sheet.getRow(1).commit();

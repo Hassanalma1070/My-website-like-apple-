@@ -1,5 +1,6 @@
 import { Router } from "express";
 import * as customers from "../customers.js";
+import { listCustomerDeals } from "../deals.js";
 import { requireAuth, requireRole } from "../auth.js";
 
 const router = Router();
@@ -43,6 +44,18 @@ router.get("/:id", async (req, res, next) => {
     const customer = await customers.getCustomerById(req.user.user_id, id);
     if (!customer) return res.status(404).json({ error: "Customer not found" });
     res.json(customer);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get("/:id/deals", async (req, res, next) => {
+  try {
+    const id = parseId(req, res);
+    if (id === null) return;
+    const deals = await listCustomerDeals(req.user.user_id, id);
+    if (!deals) return res.status(404).json({ error: "Customer not found" });
+    res.json(deals);
   } catch (err) {
     next(err);
   }
