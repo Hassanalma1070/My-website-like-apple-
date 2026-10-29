@@ -9,6 +9,7 @@ import agentRoutes from "./routes/agent.js";
 import authRoutes from "./routes/auth.js";
 import adminRoutes from "./routes/admin.js";
 import exportRoutes from "./routes/export.js";
+import dealRoutes from "./routes/deals.js";
 
 const PORT = Number(process.env.PORT) || 4000;
 const app = express();
@@ -34,6 +35,7 @@ app.get("/api/health", async (req, res) => {
 app.use("/api/auth", authRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/export", exportRoutes);
+app.use("/api/deals", dealRoutes);
 app.use("/api/customers", customerRoutes);
 app.use("/api/agent", agentRoutes);
 

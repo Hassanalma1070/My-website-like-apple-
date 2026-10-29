@@ -1,5 +1,6 @@
 import { pool } from "./db.js";
 import { dateRange, search } from "./exportFilters.js";
+import { OPEN_STAGES } from "./dealValidation.js";
 
 // Every function takes the owner's user_id first and only touches that user's rows,
 // so another user's customer behaves exactly like one that does not exist.
@@ -7,6 +8,15 @@ import { dateRange, search } from "./exportFilters.js";
 const COLUMNS = "customer_id, name, email, phone, created_at, sales_user_id";
 
 export class DuplicateCustomerEmailError extends Error {}
+
+// Deal totals for the customers list: open deal count and amount, and all deals (for the delete warning)
+const DEAL_TOTALS = `LEFT JOIN LATERAL (
+    SELECT COUNT(*) FILTER (WHERE stage IN (${OPEN_STAGES.map((s) => `'${s}'`).join(", ")}))::int AS open_deals,
+           COALESCE(SUM(amount) FILTER (WHERE stage IN (${OPEN_STAGES.map((s) => `'${s}'`).join(", ")})), 0)::numeric(16,2)::text AS open_amount,
+           COUNT(*)::int AS total_deals
+    FROM deal WHERE deal.customer_id = customer.customer_id
+  ) deals ON TRUE`;
+const LIST_COLUMNS = `${COLUMNS}, deals.open_deals, deals.open_amount, deals.total_deals`;
 
 // customer.email is unique across the whole table
 async function write(sql, params) {
@@ -20,7 +30,7 @@ async function write(sql, params) {
 
 export async function listCustomers(userId) {
   const { rows } = await pool.query(
-    `SELECT ${COLUMNS} FROM customer WHERE sales_user_id = $1 ORDER BY customer_id`,
+    `SELECT ${LIST_COLUMNS} FROM customer ${DEAL_TOTALS} WHERE sales_user_id = $1 ORDER BY customer_id`,
     [userId],
   );
   return rows;
@@ -37,7 +47,7 @@ export async function getCustomerById(userId, id) {
 // Case-insensitive partial match on name
 export async function findCustomersByName(userId, name) {
   const { rows } = await pool.query(
-    `SELECT ${COLUMNS} FROM customer WHERE sales_user_id = $1 AND name ILIKE $2 ORDER BY customer_id`,
+    `SELECT ${LIST_COLUMNS} FROM customer ${DEAL_TOTALS} WHERE sales_user_id = $1 AND name ILIKE $2 ORDER BY customer_id`,
     [userId, `%${name}%`],
   );
   return rows;

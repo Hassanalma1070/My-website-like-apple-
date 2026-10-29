@@ -7,6 +7,7 @@ import ResetPasswordView from './components/ResetPasswordView.jsx'
 import ChangePasswordDialog from './components/ChangePasswordDialog.jsx'
 import AdminDashboard from './components/AdminDashboard.jsx'
 import ExportDialog from './components/ExportDialog.jsx'
+import DealsView from './components/DealsView.jsx'
 import { clearSession, loadSession, saveSession } from './session.js'
 
 function initialSession() {
@@ -14,6 +15,9 @@ function initialSession() {
   api.setToken(session?.token ?? null)
   return session
 }
+
+// Sales users switch between the customers and deals screens with the URL hash (#deals), so a reload keeps the view
+const readView = () => (window.location.hash === '#deals' ? 'deals' : 'customers')
 
 const readResetToken = () => new URLSearchParams(window.location.search).get('reset_token')
 
@@ -33,6 +37,7 @@ export default function App() {
   const [resetToken, setResetToken] = useState(readResetToken)
   const [authNotice, setAuthNotice] = useState('')
   const [changingPassword, setChangingPassword] = useState(false)
+  const [view, setView] = useState(readView)
   // Admins only get the dashboard; the customers screen and the assistant are for sales users
   const isAdmin = session?.user.role === 'admin'
   const isSales = session && !isAdmin
@@ -51,6 +56,12 @@ export default function App() {
       .catch(() => !cancelled && setExportState({ userId, categories: [] }))
     return () => { cancelled = true }
   }, [userId])
+
+  useEffect(() => {
+    const onHashChange = () => setView(readView())
+    window.addEventListener('hashchange', onHashChange)
+    return () => window.removeEventListener('hashchange', onHashChange)
+  }, [])
 
   useEffect(() => {
     api.health().then(() => setStatus('online')).catch(() => setStatus('offline'))
@@ -111,7 +122,8 @@ export default function App() {
         <div className="globalnav-inner">
           <span className="brand">Customer Hub</span>
           <div className="globalnav-links">
-            {isSales && <a href="#customers">Customers</a>}
+            {isSales && <a href="#customers" aria-current={view === 'customers' ? 'page' : undefined}>Customers</a>}
+            {isSales && <a href="#deals" aria-current={view === 'deals' ? 'page' : undefined}>Deals</a>}
             {isSales && <button type="button" onClick={() => setChatOpen(true)}>Assistant</button>}
             {session && !resetToken && exportCategories.length > 0 && (
               <button type="button" onClick={() => setExporting(true)}>Export</button>
@@ -140,6 +152,8 @@ export default function App() {
           <ResetPasswordView token={resetToken} onDone={finishReset} onCancel={cancelReset} />
         ) : isAdmin ? (
           <AdminDashboard key={session.user.user_id} notify={notify} canExport={canExport('sales_users')} />
+        ) : isSales && view === 'deals' ? (
+          <DealsView key={session.user.user_id} notify={notify} refreshKey={refreshKey} canExport={canExport('deals')} />
         ) : session ? (
           // Keyed by user so switching accounts starts with fresh customer data
           <CustomersView
