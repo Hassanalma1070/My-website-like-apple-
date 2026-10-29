@@ -6,6 +6,7 @@ import { pool } from "./db.js";
 import { buildSpec } from "./swagger.js";
 import customerRoutes from "./routes/customers.js";
 import agentRoutes from "./routes/agent.js";
+import authRoutes from "./routes/auth.js";
 
 const PORT = Number(process.env.PORT) || 4000;
 const app = express();
@@ -27,6 +28,7 @@ app.get("/api/health", async (req, res) => {
   }
 });
 
+app.use("/api/auth", authRoutes);
 app.use("/api/customers", customerRoutes);
 app.use("/api/agent", agentRoutes);
 

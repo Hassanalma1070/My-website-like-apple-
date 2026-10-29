@@ -1,10 +1,11 @@
 import { Router } from "express";
 import Anthropic from "@anthropic-ai/sdk";
 import { chat } from "../agent.js";
+import { requireAuth } from "../auth.js";
 
 const router = Router();
 
-router.post("/chat", async (req, res, next) => {
+router.post("/chat", requireAuth, async (req, res, next) => {
   const { message, history = [] } = req.body ?? {};
   if (typeof message !== "string" || !message.trim()) {
     return res.status(400).json({ error: "message is required" });
@@ -21,7 +22,7 @@ router.post("/chat", async (req, res, next) => {
     .map((m) => ({ role: m.role, content: m.content }));
 
   try {
-    res.json(await chat(message.trim(), cleanHistory));
+    res.json(await chat(message.trim(), cleanHistory, req.user));
   } catch (err) {
     if (err instanceof Anthropic.AuthenticationError) {
       return res.status(500).json({ error: "Anthropic API key is missing or invalid. Set ANTHROPIC_API_KEY in backend/.env." });
