@@ -192,6 +192,7 @@ input, textarea { font: inherit; color: inherit; letter-spacing: inherit; }
 
 .alert { padding: 12px 14px; border-radius: 12px; margin: 0; }
 .alert-error { background: var(--danger-soft); color: var(--danger); }
+.alert-success { background: var(--primary-soft); color: var(--text); }
 
 /* Modal & form */
 .modal-backdrop {
@@ -352,9 +353,12 @@ input, textarea { font: inherit; color: inherit; letter-spacing: inherit; }
 .auth-card .btn-primary { margin-top: 4px; width: 100%; }
 .auth-switch { margin: 16px 0 0; text-align: center; }
 .auth-switch .btn-link { padding: 0; border: 0; font-size: inherit; }
+.field-label-row { display: flex; justify-content: space-between; align-items: baseline; }
+.field-label-row .btn-link { padding: 0; border: 0; font-size: 13px; font-weight: 400; }
 @media (max-width: 640px) {
   .globalnav-links { gap: 16px; }
   .user-name { display: none; }
+  .user-menu { gap: 10px; }
   .auth { padding-top: 48px; }
   .auth-card { padding: 28px 20px; }
 }

@@ -3,7 +3,8 @@ const BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:4000').repla
 let token = null
 let onUnauthorized = null
 
-async function request(path, options = {}) {
+// keepSessionOn401: a 401 here means a wrong password, not an expired session
+async function request(path, { keepSessionOn401 = false, ...options } = {}) {
   let res
   try {
     res = await fetch(`${BASE_URL}${path}`, {
@@ -18,7 +19,7 @@ async function request(path, options = {}) {
   }
   const data = await res.json().catch(() => null)
   // An expired or invalid token logs the user out; login failures are handled by the form
-  if (res.status === 401 && token) onUnauthorized?.()
+  if (res.status === 401 && token && !keepSessionOn401) onUnauthorized?.()
   if (!res.ok) throw new Error(data?.error || `Request failed (${res.status})`)
   return data
 }
@@ -30,6 +31,10 @@ export const api = {
   register: (body) => request('/api/auth/register', { method: 'POST', body: JSON.stringify(body) }),
   login: (body) => request('/api/auth/login', { method: 'POST', body: JSON.stringify(body) }),
   me: () => request('/api/auth/me'),
+  changePassword: (body) =>
+    request('/api/auth/change-password', { method: 'POST', body: JSON.stringify(body), keepSessionOn401: true }),
+  forgotPassword: (email) => request('/api/auth/forgot-password', { method: 'POST', body: JSON.stringify({ email }) }),
+  resetPassword: (body) => request('/api/auth/reset-password', { method: 'POST', body: JSON.stringify(body) }),
   listCustomers: (name) =>
     request(`/api/customers${name ? `?name=${encodeURIComponent(name)}` : ''}`),
   createCustomer: (body) => request('/api/customers', { method: 'POST', body: JSON.stringify(body) }),

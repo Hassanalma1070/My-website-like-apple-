@@ -48,6 +48,28 @@ const authResponse = {
   },
 };
 
+const newPassword = { type: "string", format: "password", minLength: 8, example: "new-password-2" };
+
+const changePasswordInput = {
+  type: "object",
+  required: ["currentPassword", "newPassword"],
+  properties: { currentPassword: { type: "string", format: "password", example: "correct-horse-1" }, newPassword },
+};
+
+const forgotPasswordInput = {
+  type: "object",
+  required: ["email"],
+  properties: { email: { type: "string", example: "sam@example.com" } },
+};
+
+const resetPasswordInput = {
+  type: "object",
+  required: ["token", "newPassword"],
+  properties: { token: { type: "string", description: "The reset_token value from the reset link" }, newPassword },
+};
+
+const message = { type: "object", properties: { message: { type: "string" } } };
+
 const customerInput = {
   type: "object",
   properties: {
@@ -73,7 +95,7 @@ export function buildSpec() {
     openapi: "3.0.3",
     info: {
       title: "Customer API",
-      version: "2.0.0",
+      version: "2.1.0",
       description: [
         "CRUD operations on customers, plus an agent endpoint that answers natural-language questions about customers using Claude.",
         "",
@@ -84,6 +106,8 @@ export function buildSpec() {
         "2. Click **Authorize** and paste the token.",
         "3. Call the Customers and Agent endpoints.",
         "4. To check access control, register a second user, authorize as them, and try to read or change the first user's customers.",
+        "",
+        "**Password reset:** `POST /api/auth/forgot-password` creates a single-use link that expires in 30 minutes. No email provider is configured yet, so during development the link is printed in the backend console (`npm run reset-link -- <email>` also prints one). Copy the `reset_token` value from the link into `POST /api/auth/reset-password`. Changing or resetting a password signs out every older token.",
       ].join("\n"),
     },
     servers: [{ url: "/" }],
@@ -102,6 +126,10 @@ export function buildSpec() {
         RegisterInput: registerInput,
         LoginInput: loginInput,
         AuthResponse: authResponse,
+        ChangePasswordInput: changePasswordInput,
+        ForgotPasswordInput: forgotPasswordInput,
+        ResetPasswordInput: resetPasswordInput,
+        Message: message,
         Customer: customer,
         CustomerInput: { ...customerInput, required: ["name"] },
         CustomerUpdate: customerInput,
@@ -139,6 +167,40 @@ export function buildSpec() {
           summary: "Get the logged-in user",
           ...secured,
           responses: { 200: { description: "The current user", ...json(ref("User")) }, 401: unauthorized },
+        },
+      },
+      "/api/auth/change-password": {
+        post: {
+          tags: ["Auth"],
+          summary: "Change your password (signs out your other sessions)",
+          ...secured,
+          description: "Returns a new token. Every token issued before the change, including the one used for this call, stops working.",
+          requestBody: { required: true, ...json(ref("ChangePasswordInput")) },
+          responses: {
+            200: { description: "Password changed", ...json(ref("AuthResponse")) },
+            400: badRequest,
+            401: { description: "Current password is incorrect, or the token is missing or invalid", ...json(ref("Error")) },
+          },
+        },
+      },
+      "/api/auth/forgot-password": {
+        post: {
+          tags: ["Auth"],
+          summary: "Request a password reset link",
+          description: "Always returns 202 with the same message, whether or not the email is registered. At most 3 links per user per hour.",
+          requestBody: { required: true, ...json(ref("ForgotPasswordInput")) },
+          responses: { 202: { description: "Request accepted", ...json(ref("Message")) }, 400: badRequest },
+        },
+      },
+      "/api/auth/reset-password": {
+        post: {
+          tags: ["Auth"],
+          summary: "Set a new password with a reset token",
+          requestBody: { required: true, ...json(ref("ResetPasswordInput")) },
+          responses: {
+            200: { description: "Password reset; sign in with the new password", ...json(ref("Message")) },
+            400: { description: "Invalid input, or the token is invalid, expired or already used", ...json(ref("Error")) },
+          },
         },
       },
       "/api/customers": {

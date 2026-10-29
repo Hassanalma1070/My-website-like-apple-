@@ -17,12 +17,12 @@ Users register and sign in. Every customer belongs to one sales person (`custome
 cd backend
 npm install
 # edit .env: set DATABASE_URL, ANTHROPIC_API_KEY and JWT_SECRET (openssl rand -hex 32)
-npm run migrate    # creates app_user and customer.sales_user_id if missing (idempotent)
+npm run migrate    # applies sql/*.sql in order (idempotent)
 npm run dev        # or: npm start
 ```
 
 - Swagger UI: http://localhost:4000/swagger (raw spec at `/swagger.json`)
-- Configuration is in `backend/.env`: `PORT`, `DATABASE_URL`, `CORS_ORIGIN` (comma-separated origins or `*`), `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL` (default `claude-opus-5-5`), `JWT_SECRET` (required), `JWT_EXPIRES_IN` (default `8h`)
+- Configuration is in `backend/.env`: `PORT`, `DATABASE_URL`, `CORS_ORIGIN` (comma-separated origins or `*`), `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL` (default `claude-opus-5-5`), `JWT_SECRET` (required), `JWT_EXPIRES_IN` (default `8h`), `FRONTEND_URL` (used in password reset links, default `http://localhost:5173`)
 
 ### Endpoints
 
@@ -33,6 +33,9 @@ All customer and agent endpoints need an `Authorization: Bearer <token>` header 
 | POST | `/api/auth/register` | Register `{ name, email, password }` (password at least 8 characters). New users always get the role `sales`. Returns `{ token, user }`. |
 | POST | `/api/auth/login` | Log in with `{ email, password }`. Returns `{ token, user }`. |
 | GET | `/api/auth/me` | The logged-in user |
+| POST | `/api/auth/change-password` | `{ currentPassword, newPassword }` while logged in. Returns a new `{ token, user }` and signs out every older token. |
+| POST | `/api/auth/forgot-password` | `{ email }`. Always returns `202` with the same message. Creates a single-use reset link that expires in 30 minutes (at most 3 per user per hour). |
+| POST | `/api/auth/reset-password` | `{ token, newPassword }` with the `reset_token` from a reset link. Signs out every older token. |
 | GET | `/api/customers` | Your customers (`?name=ali` filters by partial name) |
 | GET | `/api/customers/{id}` | One of your customers |
 | POST | `/api/customers` | Create a customer owned by you (`name` required; `email` and `phone` optional). `409` if the email is already used by any customer. |
@@ -47,6 +50,14 @@ All customer and agent endpoints need an `Authorization: Bearer <token>` header 
 2. Click **Authorize** and paste the token.
 3. Call the customer and agent endpoints.
 4. Register a second user, authorize as them, and try to read, update or delete the first user's customers: each call returns `404`.
+
+### Password reset
+
+No email provider is configured yet. Outside production, `forgot-password` prints the reset link in the backend console. An operator can also create a link for any user:
+
+```bash
+npm run reset-link -- user@example.com
+```
 
 ### Agent
 
@@ -66,7 +77,7 @@ npm run dev        # http://localhost:5173
 
 The backend URL is set with `VITE_API_URL` in `frontend/.env` (default `http://localhost:4000`).
 
-- **Sign in**: a sign-in and registration screen is shown until you log in. The header shows your name and a **Log out** button. An expired session returns you to the sign-in screen.
+- **Sign in**: a sign-in and registration screen is shown until you log in, with a **Forgot password?** link. Opening a reset link shows a **Set a new password** screen. **Change password** is in the header. The header shows your name and a **Log out** button. An expired session returns you to the sign-in screen.
 - **Layout**: top header bar with API status and a Swagger link, the full-width customer page, and a floating chat button in the bottom-right corner
 - **Customers**: table with search, totals, and add, edit and delete dialogs
 - **AI Assistant** (chat button): chat panel with suggested prompts. Answers render as Markdown and show which tools ran. The customer table refreshes when the assistant changes data. Closing the panel keeps the conversation.
