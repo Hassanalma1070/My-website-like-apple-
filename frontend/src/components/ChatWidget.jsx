@@ -11,7 +11,7 @@ const SUGGESTIONS = [
   'How many customers have no phone number?',
 ]
 
-const MUTATING_TOOLS = new Set(['add_customer', 'update_customer', 'delete_customer'])
+const MUTATING_TOOLS = new Set(['add_customer', 'update_customer', 'delete_customer', 'add_deal', 'update_deal', 'delete_deal'])
 
 const TOOL_LABELS = {
   get_all_customers: 'Listed all customers',

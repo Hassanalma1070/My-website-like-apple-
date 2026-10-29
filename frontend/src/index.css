@@ -20,6 +20,11 @@
   --shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
   --shadow-lg: 0 20px 60px rgba(0, 0, 0, 0.18);
   --radius: 18px;
+  --stage-lead: #5e5e63; --stage-lead-bg: #ececef;
+  --stage-qualified: #0058b0; --stage-qualified-bg: #e3efff;
+  --stage-proposal: #8a4b00; --stage-proposal-bg: #fff1dc;
+  --stage-won: #1a7f37; --stage-won-bg: #e2f6e8;
+  --stage-lost: #b42318; --stage-lost-bg: #fdecea;
   font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', 'Helvetica Neue', Helvetica, Arial, sans-serif;
   color: var(--text);
   background: var(--bg);
@@ -48,6 +53,11 @@
     --nav-text: rgba(255, 255, 255, 0.8);
     --glass: rgba(29, 29, 31, 0.78);
     --shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+    --stage-lead: #c7c7cc; --stage-lead-bg: #2c2c2e;
+    --stage-qualified: #6cb4ff; --stage-qualified-bg: #0f2a47;
+    --stage-proposal: #ffb95a; --stage-proposal-bg: #3d2a0d;
+    --stage-won: #4cd774; --stage-won-bg: #0f3319;
+    --stage-lost: #ff7b72; --stage-lost-bg: #3a1414;
   }
 }
 
@@ -129,6 +139,30 @@ input, textarea { font: inherit; color: inherit; letter-spacing: inherit; }
 .stats-2 { grid-template-columns: repeat(2, 1fr); }
 .hero-compact { padding-bottom: 56px; }
 .toolbar-end { justify-content: flex-end; }
+.toolbar-wrap { flex-wrap: wrap; }
+.toolbar-wrap .search { min-width: 220px; }
+.filter-select, .field select, .stage-select {
+  height: 44px; padding: 0 12px; border-radius: 12px; border: 1px solid var(--border);
+  background: var(--surface); color: var(--text); font-size: 15px;
+}
+.field select { height: auto; padding: 12px 14px; font-size: 17px; }
+.field input:disabled { color: var(--muted); }
+.field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.nowrap { white-space: nowrap; }
+.table-wrap-flush { margin: 0; }
+.stat-money { font-size: 40px; }
+
+/* Deal stages */
+.stage { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+.stage-select { height: 30px; padding: 0 8px; border-radius: 999px; font-size: 13px; font-weight: 600; border-color: transparent; cursor: pointer; }
+.stage-select:disabled { opacity: 0.6; cursor: progress; }
+.stage-lead { background: var(--stage-lead-bg); color: var(--stage-lead); }
+.stage-qualified { background: var(--stage-qualified-bg); color: var(--stage-qualified); }
+.stage-proposal { background: var(--stage-proposal-bg); color: var(--stage-proposal); }
+.stage-won { background: var(--stage-won-bg); color: var(--stage-won); }
+.stage-lost { background: var(--stage-lost-bg); color: var(--stage-lost); }
+.stage-overdue { background: var(--danger-soft); color: var(--danger); }
+.overdue-date { color: var(--danger); font-weight: 600; }
 .export-categories { border: 0; margin: 0; padding: 0; min-width: 0; }
 .export-categories > span { font-weight: 600; font-size: 13px; color: var(--muted); margin-bottom: 4px; }
 .checkbox { display: flex; align-items: center; gap: 10px; font-size: 15px; padding: 4px 0; }
@@ -380,4 +414,7 @@ input, textarea { font: inherit; color: inherit; letter-spacing: inherit; }
   .toolbar .search { flex-basis: 100%; }
   .toolbar .btn { flex: 1; justify-content: center; }
   .export-dates { grid-template-columns: 1fr; }
+  .field-row { grid-template-columns: 1fr; }
+  .toolbar-wrap .filter-select { flex: 1; }
+  .stat-money { font-size: 24px; }
 }

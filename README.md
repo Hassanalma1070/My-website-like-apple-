@@ -11,6 +11,8 @@ The backend allows cross-origin requests (CORS). The frontend calls it over REST
 
 Users register and sign in. Every customer belongs to one sales person (`customer.sales_user_id`), and each user can only see and change their own customers, through the REST API, the UI and the AI agent. Another user's customer returns `404`, the same as one that does not exist.
 
+Sales users also track **deals**: sales opportunities with a customer (title, amount in ₹, stage Lead → Qualified → Proposal → Won / Lost, expected close date). A customer can have many deals.
+
 Admins sign in separately and see a read-only dashboard of every sales user and how many customers each one owns. Admins don't use the customer screens or the agent.
 
 ## Backend
@@ -44,6 +46,12 @@ All customer and agent endpoints need an `Authorization: Bearer <token>` header 
 | POST | `/api/customers` | Create a customer owned by you (`name` required; `email` and `phone` optional). `409` if the email is already used by any customer. |
 | PUT | `/api/customers/{id}` | Update the fields you send |
 | DELETE | `/api/customers/{id}` | Delete |
+| GET | `/api/customers/{id}/deals` | One of your customers' deals |
+| GET | `/api/deals` | Your deals and pipeline totals. Query: `stage` (a stage, `open` or `closed`), `customer_id`, `q` (title), `tz` |
+| GET | `/api/deals/{id}` | One of your deals |
+| POST | `/api/deals` | `{ customer_id, title, amount, stage?, expected_close_date? }` for one of your customers (`404` otherwise) |
+| PUT | `/api/deals/{id}` | Update any of `title`, `amount`, `stage`, `expected_close_date` (`null` clears it). The customer can't change. |
+| DELETE | `/api/deals/{id}` | Delete one of your deals |
 | POST | `/api/agent/chat` | Ask a question in natural language: `{ "message": "Get all customers", "history": [] }` |
 | POST | `/api/admin/login` | Admin login with `{ email, password }`. Returns `{ token, user }`. Sales accounts get `403`. |
 | GET | `/api/admin/users` | Admin only. `{ summary: { sales_users, total_customers }, users: [{ user_id, name, email, created_at, customer_count }] }` for every sales user. |
@@ -85,6 +93,7 @@ Users can export the data they can view to an Excel workbook, one sheet per cate
 | Role | Category | Sheet |
 |---|---|---|
 | sales | `customers` | Your customers: ID, name, email, phone (as text), created |
+| sales | `deals` | Your deals: ID, customer, title, amount (₹), stage, expected close, created, updated |
 | admin | `sales_users` | Sales users with joined date and customer count |
 
 - In the app: **Export to Excel** on the customers screen (uses the current search) and on the admin dashboard, and **Export** in the header (choose categories and an optional date range).
@@ -92,11 +101,18 @@ Users can export the data they can view to an Excel workbook, one sheet per cate
 - At most 100,000 rows per export (`MAX_EXPORT_ROWS` in `src/exports.js`); larger exports get `413`.
 - Every export is logged in the `export_log` table (user, time, categories, filters, row count, status). It is created by `sql/003_export_log.sql`, so run `npm run migrate` after pulling.
 
+### Deals
+
+- Deal endpoints are for sales users only (admins get `403`); another user's deal returns `404`, like customers. Deleting a customer deletes its deals.
+- `amount` is sent and returned as a string with two decimals (`"150000.00"`); input can be a number or a string. `expected_close_date` is `"YYYY-MM-DD"` or `null`.
+- Any stage can be set from any other. Open = lead, qualified, proposal. The customers list includes `open_deals`, `open_amount` and `total_deals` per customer.
+- Uses the existing `deal` table; no migration.
+
 ### Agent
 
 `POST /api/agent/chat` sends the question to Claude through the Anthropic SDK's tool runner. Claude can use these tools, which only reach the logged-in user's customers:
 
-`get_all_customers`, `get_customer_by_name`, `get_customer_by_id`, `add_customer`, `update_customer`, `delete_customer`
+`get_all_customers`, `get_customer_by_name`, `get_customer_by_id`, `add_customer`, `update_customer`, `delete_customer`, `get_deals`, `get_customer_deals`, `add_deal`, `update_deal`, `delete_deal`
 
 The response contains the reply and the tools that ran: `{ "reply": "...", "toolCalls": [{ "name": "get_all_customers", "input": {}, "ok": true }] }`.
 

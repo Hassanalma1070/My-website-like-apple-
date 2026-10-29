@@ -69,6 +69,16 @@ export const api = {
   deleteCustomer: (id) => request(`/api/customers/${id}`, { method: 'DELETE' }),
   chat: (message, history) =>
     request('/api/agent/chat', { method: 'POST', body: JSON.stringify({ message, history }) }),
+  // filters: { stage, customer_id, q }; empty values are left out
+  listDeals: (filters = {}) => {
+    const params = new URLSearchParams({ tz: timeZone() })
+    for (const [key, value] of Object.entries(filters)) if (value) params.set(key, value)
+    return request(`/api/deals?${params}`)
+  },
+  getCustomerDeals: (customerId) => request(`/api/customers/${customerId}/deals`),
+  createDeal: (body) => request('/api/deals', { method: 'POST', body: JSON.stringify(body) }),
+  updateDeal: (id, body) => request(`/api/deals/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  deleteDeal: (id) => request(`/api/deals/${id}`, { method: 'DELETE' }),
   exportCategories: () => request('/api/export/categories'),
   // categories: an array of keys, or 'all'. Empty filters are left out.
   exportData: ({ categories, q, from, to }) => {
