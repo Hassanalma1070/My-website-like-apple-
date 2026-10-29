@@ -1,7 +1,7 @@
 # Plan 03: Admin Login and Sales Users Dashboard
 
 - **Spec:** [`_specs/03_spec_admin_login.md`](../_specs/03_spec_admin_login.md) (approved 2026-10-29)
-- **Status:** Ready for implementation
+- **Status:** Done. Merged to `main` in PR #2, which merged `feature/03-admin-dashboard` (stacked on `feature/02-password-reset`) and so brought in specs 02 and 03 together
 - **Branch:** `feature/03-admin-dashboard`
 
 ## Step 0: Prepare

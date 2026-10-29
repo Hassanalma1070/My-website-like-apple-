@@ -1,7 +1,7 @@
 # Plan 02: Password Reset and Change
 
 - **Spec:** [`_specs/02_spec_password_reset.md`](../_specs/02_spec_password_reset.md) (approved 2026-10-29)
-- **Status:** Ready for implementation
+- **Status:** Done. Merged to `main` in PR #2, which merged `feature/03-admin-dashboard` (stacked on `feature/02-password-reset`) and so brought in specs 02 and 03 together
 - **Branch:** `feature/02-password-reset`
 
 ## Step 0: Prepare

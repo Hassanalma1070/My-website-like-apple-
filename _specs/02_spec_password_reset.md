@@ -1,6 +1,6 @@
 # Spec 02: Password Reset and Change
 
-- **Status:** Approved (2026-10-29)
+- **Status:** Done. Implemented and merged to `main` in PR #2 (2026-10-29), together with spec 03
 - **Date:** 2026-10-29
 - **Depends on:** Spec 01 (registration, login, per-user access)
 - **Affects:** `backend/` (DB, auth API, Swagger) and `frontend/`
