@@ -163,3 +163,7 @@ The user approved the spec and asked for industry best practice on the open ques
    `UPDATE customer SET sales_person_id = <user_id> WHERE sales_person_id IS NULL;`
 2. **`404 Not found` for another user's customer.** This follows the OWASP guidance against revealing which IDs exist (object enumeration).
 3. **Bearer token in `localStorage`, with an 8-hour expiry.** httpOnly cookies are stronger against XSS, but they would need cross-site cookies between the separate Vercel domains, CORS with credentials (which can't be used with `CORS_ORIGIN=*`), and CSRF protection, and Swagger testing uses a bearer token anyway. The risk is reduced by the short expiry, React's default escaping, and never rendering raw HTML from chat Markdown.
+
+## Implementation note (2026-10-29)
+
+The shared database already had the auth schema when implementation started: `app_user` exists, and the owner column on `customer` is named **`sales_user_id`** (already `NOT NULL`, with every existing customer assigned). The implementation uses that existing column instead of adding `sales_person_id`, and the `Customer` response field is `sales_user_id`. Decision 1 (unowned customers) therefore does not apply. The database role check also allows `admin`; this feature still only creates `sales` users and gives `admin` users no extra access. `customer.email` is unique across all users, so creating or updating a customer with an email another user's customer already has returns `409`.

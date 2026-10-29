@@ -1,7 +1,7 @@
 # Plan 01: User Registration, Login and Per-User Customer Access
 
 - **Spec:** [`_specs/01_spec_userlogin_registration.md`](../_specs/01_spec_userlogin_registration.md) (approved 2026-10-29)
-- **Status:** Ready for implementation
+- **Status:** Implemented on `feature/01-user-auth` (see the implementation note in the spec: the database already used `customer.sales_user_id`)
 - **Branch:** `feature/01-user-auth` (created from `main` after the spec and plan are committed)
 
 ## Step 0: Prepare
