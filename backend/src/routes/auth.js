@@ -36,7 +36,18 @@ function validateCredentials(body, { requireName }) {
   return null;
 }
 
-const session = (user) => ({ token: signToken(user), user: users.publicUser(user) });
+export const session = (user) => ({ token: signToken(user), user: users.publicUser(user) });
+
+// Shared by the sales and admin logins. Returns { user } or { status, error }.
+// Callers check the role only after this succeeds, so a role is never revealed without the password.
+export async function checkCredentials(body) {
+  const error = validateCredentials(body, { requireName: false });
+  if (error) return { status: 400, error };
+  const found = await users.findUserByEmail(body.email.trim());
+  const ok = await verifyPassword(body.password, found?.password_hash ?? (await getDummyHash()));
+  if (!found || !ok) return { status: 401, error: "Invalid email or password" };
+  return { user: found };
+}
 
 router.post("/register", async (req, res, next) => {
   try {
@@ -59,12 +70,10 @@ router.post("/register", async (req, res, next) => {
 router.post("/login", async (req, res, next) => {
   try {
     if (!isAuthConfigured()) return authNotConfigured(res);
-    const error = validateCredentials(req.body, { requireName: false });
-    if (error) return res.status(400).json({ error });
-    const found = await users.findUserByEmail(req.body.email.trim());
-    const ok = await verifyPassword(req.body.password, found?.password_hash ?? (await getDummyHash()));
-    if (!found || !ok) return res.status(401).json({ error: "Invalid email or password" });
-    res.json(session(found));
+    const { user, status, error } = await checkCredentials(req.body);
+    if (error) return res.status(status).json({ error });
+    if (user.role === "admin") return res.status(403).json({ error: "Admin accounts sign in on the admin login page." });
+    res.json(session(user));
   } catch (err) {
     next(err);
   }

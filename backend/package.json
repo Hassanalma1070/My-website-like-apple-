@@ -8,7 +8,8 @@
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
     "migrate": "node scripts/migrate.js",
-    "reset-link": "node scripts/reset-link.js"
+    "reset-link": "node scripts/reset-link.js",
+    "seed-admin": "node scripts/seed-admin.js"
   },
   "keywords": [],
   "author": "",

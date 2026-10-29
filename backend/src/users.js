@@ -23,6 +23,20 @@ export async function createUser({ name, email, passwordHash }) {
   }
 }
 
+// Only used by the seed-admin command; registration always gets the database default role ('sales')
+export async function createAdmin({ name, email, passwordHash }) {
+  try {
+    const { rows } = await pool.query(
+      `INSERT INTO app_user (name, email, password_hash, role) VALUES ($1, $2, $3, 'admin') RETURNING ${COLUMNS}`,
+      [name, email.toLowerCase(), passwordHash],
+    );
+    return rows[0];
+  } catch (err) {
+    if (err.code === "23505") throw new DuplicateEmailError("Email is already registered");
+    throw err;
+  }
+}
+
 // Includes password_hash; only used to check a password
 export async function findUserByEmail(email) {
   const { rows } = await pool.query(
@@ -43,9 +57,10 @@ export async function getUserById(id) {
   return rows[0] ?? null;
 }
 
-export async function getTokenVersion(id) {
-  const { rows } = await pool.query("SELECT token_version FROM app_user WHERE user_id = $1", [id]);
-  return rows[0]?.token_version ?? null;
+// Read on every authenticated request, so a password or role change applies to existing tokens
+export async function getAuthState(id) {
+  const { rows } = await pool.query("SELECT token_version, role FROM app_user WHERE user_id = $1", [id]);
+  return rows[0] ?? null;
 }
 
 // Sets a new password and bumps token_version, which signs out every existing token.

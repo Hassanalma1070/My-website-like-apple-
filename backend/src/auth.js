@@ -1,6 +1,6 @@
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import { getTokenVersion } from "./users.js";
+import { getAuthState } from "./users.js";
 
 const BCRYPT_COST = 10;
 const ALGORITHM = "HS256";
@@ -40,12 +40,19 @@ export async function requireAuth(req, res, next) {
   }
   const userId = Number(payload.sub);
   if (!Number.isInteger(userId) || userId <= 0 || !Number.isInteger(payload.ver)) return invalidToken(res);
+  let state;
   try {
-    // A deleted user or a password change since the token was issued both end the session
-    if ((await getTokenVersion(userId)) !== payload.ver) return invalidToken(res);
+    state = await getAuthState(userId);
   } catch (err) {
     return next(err);
   }
-  req.user = { user_id: userId, email: payload.email, role: payload.role };
+  // A deleted user or a password change since the token was issued both end the session
+  if (!state || state.token_version !== payload.ver) return invalidToken(res);
+  // The role comes from the database, not the token, so a role change applies immediately
+  req.user = { user_id: userId, email: payload.email, role: state.role };
   next();
 }
+
+// Use after requireAuth
+export const requireRole = (role) => (req, res, next) =>
+  req.user?.role === role ? next() : res.status(403).json({ error: "Forbidden" });

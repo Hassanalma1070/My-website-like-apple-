@@ -7,6 +7,7 @@ import { buildSpec } from "./swagger.js";
 import customerRoutes from "./routes/customers.js";
 import agentRoutes from "./routes/agent.js";
 import authRoutes from "./routes/auth.js";
+import adminRoutes from "./routes/admin.js";
 
 const PORT = Number(process.env.PORT) || 4000;
 const app = express();
@@ -29,6 +30,7 @@ app.get("/api/health", async (req, res) => {
 });
 
 app.use("/api/auth", authRoutes);
+app.use("/api/admin", adminRoutes);
 app.use("/api/customers", customerRoutes);
 app.use("/api/agent", agentRoutes);
 
