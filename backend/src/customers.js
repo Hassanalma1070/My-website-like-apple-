@@ -1,4 +1,5 @@
 import { pool } from "./db.js";
+import { dateRange, search } from "./exportFilters.js";
 
 // Every function takes the owner's user_id first and only touches that user's rows,
 // so another user's customer behaves exactly like one that does not exist.
@@ -68,4 +69,28 @@ export async function deleteCustomer(userId, id) {
     [id, userId],
   );
   return rows[0] ?? null;
+}
+
+// Export: the user's customers matching the filters ({ q, from, to, tz }), sorted by customer_id.
+// q matches like the customers screen's search: name, email, phone or customer ID.
+function exportWhere(userId, filters) {
+  const params = [userId];
+  const where = [
+    "sales_user_id = $1",
+    search(["name", "email", "phone", "customer_id::text"], filters.q, params),
+    dateRange("created_at", filters, params),
+  ].join(" AND ");
+  return { where, params };
+}
+
+export async function countCustomersForExport(userId, filters) {
+  const { where, params } = exportWhere(userId, filters);
+  const { rows } = await pool.query(`SELECT COUNT(*)::int AS n FROM customer WHERE ${where}`, params);
+  return rows[0].n;
+}
+
+export async function listCustomersForExport(userId, filters) {
+  const { where, params } = exportWhere(userId, filters);
+  const { rows } = await pool.query(`SELECT ${COLUMNS} FROM customer WHERE ${where} ORDER BY customer_id`, params);
+  return rows;
 }
