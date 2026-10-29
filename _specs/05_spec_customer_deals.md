@@ -1,6 +1,6 @@
 # Spec 05: Customer Deals
 
-- **Status:** Approved (2026-10-29)
+- **Status:** Done. Implemented and merged to `main` in PR #4 (2026-10-29)
 - **Date:** 2026-10-29
 - **Depends on:** Spec 01 (per-user customer access), Spec 03 (roles), Spec 04 (export category registry, for 7.4)
 - **Affects:** `backend/` (deals data access, REST API, agent tools, export, Swagger) and `frontend/`

@@ -1,7 +1,7 @@
 # Plan 04: Export Data to Excel by Category
 
 - **Spec:** [`_specs/04_spec_export_excel.md`](../_specs/04_spec_export_excel.md) (approved 2026-10-29)
-- **Status:** Ready for implementation
+- **Status:** Done. Merged to `main` in PR #3
 - **Branch:** `feature/04-export-excel`
 
 ## Step 0: Prepare

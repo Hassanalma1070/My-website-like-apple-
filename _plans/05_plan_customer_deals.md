@@ -1,7 +1,7 @@
 # Plan 05: Customer Deals
 
 - **Spec:** [`_specs/05_spec_customer_deals.md`](../_specs/05_spec_customer_deals.md) (approved 2026-10-29)
-- **Status:** Ready for implementation
+- **Status:** Done. Merged to `main` in PR #4 (built on `feature/04-export-excel`, then retargeted to `main`)
 - **Branch:** `feature/05-customer-deals`
 
 ## Step 0: Prepare

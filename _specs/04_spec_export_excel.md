@@ -1,6 +1,6 @@
 # Spec 04: Export Data to Excel by Category
 
-- **Status:** Approved (2026-10-29)
+- **Status:** Done. Implemented and merged to `main` in PR #3 (2026-10-29)
 - **Date:** 2026-10-29
 - **Depends on:** Spec 01 (per-user customer access), Spec 03 (admin role and sales users dashboard)
 - **Affects:** `backend/` (new export API, export log table, Swagger, one new dependency) and `frontend/`
