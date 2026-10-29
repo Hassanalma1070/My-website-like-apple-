@@ -30,6 +30,8 @@ export const api = {
   setOnUnauthorized: (fn) => { onUnauthorized = fn },
   register: (body) => request('/api/auth/register', { method: 'POST', body: JSON.stringify(body) }),
   login: (body) => request('/api/auth/login', { method: 'POST', body: JSON.stringify(body) }),
+  adminLogin: (body) => request('/api/admin/login', { method: 'POST', body: JSON.stringify(body) }),
+  adminUsers: () => request('/api/admin/users'),
   me: () => request('/api/auth/me'),
   changePassword: (body) =>
     request('/api/auth/change-password', { method: 'POST', body: JSON.stringify(body), keepSessionOn401: true }),

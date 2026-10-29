@@ -11,6 +11,8 @@ The backend allows cross-origin requests (CORS). The frontend calls it over REST
 
 Users register and sign in. Every customer belongs to one sales person (`customer.sales_user_id`), and each user can only see and change their own customers, through the REST API, the UI and the AI agent. Another user's customer returns `404`, the same as one that does not exist.
 
+Admins sign in separately and see a read-only dashboard of every sales user and how many customers each one owns. Admins don't use the customer screens or the agent.
+
 ## Backend
 
 ```bash
@@ -18,20 +20,21 @@ cd backend
 npm install
 # edit .env: set DATABASE_URL, ANTHROPIC_API_KEY and JWT_SECRET (openssl rand -hex 32)
 npm run migrate    # applies sql/*.sql in order (idempotent)
+npm run seed-admin # creates the default admin (admin@admin.com / 123456789)
 npm run dev        # or: npm start
 ```
 
 - Swagger UI: http://localhost:4000/swagger (raw spec at `/swagger.json`)
-- Configuration is in `backend/.env`: `PORT`, `DATABASE_URL`, `CORS_ORIGIN` (comma-separated origins or `*`), `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL` (default `claude-opus-5-5`), `JWT_SECRET` (required), `JWT_EXPIRES_IN` (default `8h`), `FRONTEND_URL` (used in password reset links, default `http://localhost:5173`)
+- Configuration is in `backend/.env`: `PORT`, `DATABASE_URL`, `CORS_ORIGIN` (comma-separated origins or `*`), `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL` (default `claude-opus-5-5`), `JWT_SECRET` (required), `JWT_EXPIRES_IN` (default `8h`), `FRONTEND_URL` (used in password reset links, default `http://localhost:5173`), `ADMIN_EMAIL` and `ADMIN_PASSWORD` (only for `npm run seed-admin`)
 
 ### Endpoints
 
-All customer and agent endpoints need an `Authorization: Bearer <token>` header and return `401` without a valid one.
+All customer and agent endpoints need an `Authorization: Bearer <token>` header and return `401` without a valid one. They are for sales users only: an admin token gets `403`.
 
 | Method | Path | Description |
 |---|---|---|
 | POST | `/api/auth/register` | Register `{ name, email, password }` (password at least 8 characters). New users always get the role `sales`. Returns `{ token, user }`. |
-| POST | `/api/auth/login` | Log in with `{ email, password }`. Returns `{ token, user }`. |
+| POST | `/api/auth/login` | Log in as a sales user with `{ email, password }`. Returns `{ token, user }`. Admin accounts get `403`. |
 | GET | `/api/auth/me` | The logged-in user |
 | POST | `/api/auth/change-password` | `{ currentPassword, newPassword }` while logged in. Returns a new `{ token, user }` and signs out every older token. |
 | POST | `/api/auth/forgot-password` | `{ email }`. Always returns `202` with the same message. Creates a single-use reset link that expires in 30 minutes (at most 3 per user per hour). |
@@ -42,6 +45,8 @@ All customer and agent endpoints need an `Authorization: Bearer <token>` header 
 | PUT | `/api/customers/{id}` | Update the fields you send |
 | DELETE | `/api/customers/{id}` | Delete |
 | POST | `/api/agent/chat` | Ask a question in natural language: `{ "message": "Get all customers", "history": [] }` |
+| POST | `/api/admin/login` | Admin login with `{ email, password }`. Returns `{ token, user }`. Sales accounts get `403`. |
+| GET | `/api/admin/users` | Admin only. `{ summary: { sales_users, total_customers }, users: [{ user_id, name, email, created_at, customer_count }] }` for every sales user. |
 | GET | `/api/health` | Health check, including the database connection |
 
 ### Testing auth in Swagger
@@ -58,6 +63,18 @@ No email provider is configured yet. Outside production, `forgot-password` print
 ```bash
 npm run reset-link -- user@example.com
 ```
+
+### Admin
+
+```bash
+npm run seed-admin
+```
+
+Creates the admin `admin@admin.com` with the password `123456789`, or the values of `ADMIN_EMAIL` and `ADMIN_PASSWORD` in `.env`. Running it again changes nothing, and it never turns an existing sales user into an admin. **The default password is weak: change it after the first login** (header, **Change password**). A forgotten admin password can be reset with `npm run reset-link -- admin@admin.com`.
+
+In the frontend, use the **Admin sign in** link under the sign-in form. In Swagger, call `POST /api/admin/login`, click **Authorize**, then call `GET /api/admin/users`.
+
+The role is read from the database on every request, so changing a user's role takes effect on their existing token right away.
 
 ### Agent
 

@@ -8,10 +8,11 @@ const COPY = {
   login: { title: 'Sign in', sub: 'Sign in to manage your customers.', submit: 'Sign in' },
   register: { title: 'Create your account', sub: 'New accounts are created as sales users.', submit: 'Create account' },
   forgot: { title: 'Reset your password', sub: "Enter your email and we'll send you a reset link.", submit: 'Send reset link' },
+  admin: { title: 'Admin sign in', sub: 'Sign in with an admin account to see the sales team overview.', submit: 'Sign in as admin' },
 }
 
 export default function AuthView({ onAuthenticated, notice = '' }) {
-  const [mode, setMode] = useState('login') // login | register | forgot
+  const [mode, setMode] = useState('login') // login | register | forgot | admin
   const [form, setForm] = useState({ name: '', email: '', password: '' })
   const [errors, setErrors] = useState({})
   const [serverError, setServerError] = useState('')
@@ -19,6 +20,7 @@ export default function AuthView({ onAuthenticated, notice = '' }) {
   const [busy, setBusy] = useState(false)
   const isRegister = mode === 'register'
   const isForgot = mode === 'forgot'
+  const isAdmin = mode === 'admin'
 
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }))
 
@@ -54,7 +56,9 @@ export default function AuthView({ onAuthenticated, notice = '' }) {
       const body = { email: form.email.trim(), password: form.password }
       const session = isRegister
         ? await api.register({ ...body, name: form.name.trim() })
-        : await api.login(body)
+        : isAdmin
+          ? await api.adminLogin(body)
+          : await api.login(body)
       onAuthenticated(session)
     } catch (err) {
       setServerError(err.message)
@@ -93,7 +97,7 @@ export default function AuthView({ onAuthenticated, notice = '' }) {
             <label className="field">
               <span className="field-label-row">
                 Password
-                {!isRegister && (
+                {mode === 'login' && (
                   <button type="button" className="btn-link" onClick={() => switchMode('forgot')}>Forgot password?</button>
                 )}
               </span>
@@ -112,8 +116,10 @@ export default function AuthView({ onAuthenticated, notice = '' }) {
           </button>
         </form>
         <p className="auth-switch muted">
-          {isForgot ? (
-            <button type="button" className="btn-link" onClick={() => switchMode('login')}>Back to sign in</button>
+          {isForgot || isAdmin ? (
+            <button type="button" className="btn-link" onClick={() => switchMode('login')}>
+              {isAdmin ? 'Back to sales sign in' : 'Back to sign in'}
+            </button>
           ) : (
             <>
               {isRegister ? 'Already have an account?' : 'New here?'}{' '}
@@ -123,6 +129,11 @@ export default function AuthView({ onAuthenticated, notice = '' }) {
             </>
           )}
         </p>
+        {mode === 'login' && (
+          <p className="auth-switch auth-admin muted small">
+            <button type="button" className="btn-link" onClick={() => switchMode('admin')}>Admin sign in</button>
+          </p>
+        )}
       </div>
     </div>
   )
