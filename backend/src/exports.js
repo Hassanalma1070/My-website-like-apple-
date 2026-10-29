@@ -65,7 +65,7 @@ function validDate(value) {
   return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
 }
 
-// Returns { categories, filters } or { status, error }
+// Returns { categories, all, filters } or { status, error }; all is true for categories=all
 export function parseExportRequest(query, role) {
   const raw = typeof query.categories === "string" ? query.categories.trim() : "";
   if (!raw) return { status: 400, error: "categories is required (comma-separated keys, or all)" };
@@ -98,7 +98,7 @@ export function parseExportRequest(query, role) {
     to: to || undefined,
     tz: validTimeZone(query.tz) ? query.tz : "UTC",
   };
-  return { categories, filters };
+  return { categories, all: raw === "all", filters };
 }
 
 // The wall-clock fields of `date` in `tz`, as numbers
@@ -118,9 +118,10 @@ export function zonedDate(date, tz) {
 
 const pad = (n) => String(n).padStart(2, "0");
 
-// CustomerHub_<Category or All>_<YYYY-MM-DD_HHmm>.xlsx, in the user's time zone
-export function exportFileName(categories, role, tz, now = new Date()) {
-  const label = categories.length === categoriesFor(role).length ? "All" : categories.map((c) => c.fileName).join("-");
+// CustomerHub_<Category or All>_<YYYY-MM-DD_HHmm>.xlsx, in the user's time zone.
+// "All" only for an Export All request, so a single-category export is named after its category.
+export function exportFileName(categories, all, tz, now = new Date()) {
+  const label = all ? "All" : categories.map((c) => c.fileName).join("-");
   const p = zonedParts(now, tz);
   return `CustomerHub_${label}_${p.year}-${pad(p.month)}-${pad(p.day)}_${pad(p.hour)}${pad(p.minute)}.xlsx`;
 }

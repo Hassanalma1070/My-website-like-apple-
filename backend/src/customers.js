@@ -91,6 +91,12 @@ export async function countCustomersForExport(userId, filters) {
 
 export async function listCustomersForExport(userId, filters) {
   const { where, params } = exportWhere(userId, filters);
-  const { rows } = await pool.query(`SELECT ${COLUMNS} FROM customer WHERE ${where} ORDER BY customer_id`, params);
+  // customer.created_at is TIMESTAMP WITHOUT TIME ZONE holding UTC; pg would read it as server-local time,
+  // so mark it as UTC to get the right instant for the user's time zone in the file
+  const { rows } = await pool.query(
+    `SELECT customer_id, name, email, phone, created_at AT TIME ZONE 'UTC' AS created_at, sales_user_id
+     FROM customer WHERE ${where} ORDER BY customer_id`,
+    params,
+  );
   return rows;
 }

@@ -15,7 +15,7 @@ router.get("/categories", (req, res) => {
 router.get("/", async (req, res, next) => {
   const parsed = parseExportRequest(req.query, req.user.role);
   if (parsed.error) return res.status(parsed.status).json({ error: parsed.error });
-  const { categories, filters } = parsed;
+  const { categories, all, filters } = parsed;
   const log = (recordCount, status) => logExport({ user: req.user, categories, filters, recordCount, status });
 
   let sheets;
@@ -37,7 +37,7 @@ router.get("/", async (req, res, next) => {
   }
 
   res.setHeader("Content-Type", XLSX_TYPE);
-  res.setHeader("Content-Disposition", `attachment; filename="${exportFileName(categories, req.user.role, filters.tz)}"`);
+  res.setHeader("Content-Disposition", `attachment; filename="${exportFileName(categories, all, filters.tz)}"`);
   res.setHeader("X-Export-Rows", String(total));
   try {
     await writeWorkbook(res, sheets, filters.tz);
