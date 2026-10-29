@@ -335,3 +335,26 @@ input, textarea { font: inherit; color: inherit; letter-spacing: inherit; }
   .api-status span:last-child { display: none; }
   .globalnav-inner { padding: 0 16px; gap: 12px; }
 }
+
+/* Sign in / register */
+.globalnav-end { display: flex; align-items: center; gap: 20px; min-width: 0; }
+.user-menu { display: inline-flex; align-items: center; gap: 12px; min-width: 0; }
+.user-name { font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 160px; }
+.user-menu button { color: var(--link); background: none; border: 0; padding: 0; font-size: 12px; }
+.user-menu button:hover { text-decoration: underline; }
+.auth { display: flex; justify-content: center; padding: 80px 16px 120px; animation: fadeUp 0.6s ease both; }
+.auth-card {
+  width: 100%; max-width: 400px; padding: 36px 32px; border-radius: var(--radius);
+  background: var(--section); display: flex; flex-direction: column; gap: 8px;
+}
+.auth-card h2 { font-size: 32px; }
+.auth-card > .muted { margin: 0 0 16px; }
+.auth-card .btn-primary { margin-top: 4px; width: 100%; }
+.auth-switch { margin: 16px 0 0; text-align: center; }
+.auth-switch .btn-link { padding: 0; border: 0; font-size: inherit; }
+@media (max-width: 640px) {
+  .globalnav-links { gap: 16px; }
+  .user-name { display: none; }
+  .auth { padding-top: 48px; }
+  .auth-card { padding: 28px 20px; }
+}

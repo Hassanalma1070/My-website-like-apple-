@@ -2,19 +2,24 @@ import Anthropic from "@anthropic-ai/sdk";
 import { betaZodTool } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { z } from "zod";
 import * as customers from "./customers.js";
+import { getUserById } from "./users.js";
 
 const client = new Anthropic(); // reads ANTHROPIC_API_KEY from the environment
 const MODEL = process.env.ANTHROPIC_MODEL || "claude-opus-5-5";
 
-const SYSTEM_PROMPT = `You are a customer-data assistant for an internal admin dashboard.
+const systemPrompt = (user) => `You are a customer-data assistant for an internal sales dashboard.
+You are assisting the sales person ${user.name}. You can only see and manage this sales person's own customers.
+If a customer is not found, say so; do not speculate about customers that belong to other users.
 You answer questions about the customer table and can create, update and delete customers using the provided tools.
 Always use the tools to read data. Never invent customers or fields.
 The customer fields are customer_id, name, email, phone and created_at.
 When a request is ambiguous (for example, several customers match a name for an update or delete), list the matches and ask which one the user means.
 Keep answers short. Use Markdown tables when showing more than one customer.`;
 
-// Tools are built per request so each call can record which tools ran.
-function buildTools(toolCalls) {
+// Tools are built per request so each call can record which tools ran and is bound to the
+// logged-in user. The user id comes from this closure and is never a tool input, so the
+// model cannot reach another user's customers.
+function buildTools(toolCalls, userId) {
   const tool = (def) =>
     betaZodTool({
       ...def,
@@ -35,19 +40,19 @@ function buildTools(toolCalls) {
       name: "get_all_customers",
       description: "Return every customer in the database, ordered by customer_id.",
       inputSchema: z.object({}),
-      run: () => customers.listCustomers(),
+      run: () => customers.listCustomers(userId),
     }),
     tool({
       name: "get_customer_by_name",
       description: "Find customers whose name contains the given text (case-insensitive partial match).",
       inputSchema: z.object({ name: z.string().describe("Full or partial customer name") }),
-      run: ({ name }) => customers.findCustomersByName(name),
+      run: ({ name }) => customers.findCustomersByName(userId, name),
     }),
     tool({
       name: "get_customer_by_id",
       description: "Return one customer by its numeric customer_id.",
       inputSchema: z.object({ customer_id: z.number().int().positive() }),
-      run: ({ customer_id }) => customers.getCustomerById(customer_id),
+      run: ({ customer_id }) => customers.getCustomerById(userId, customer_id),
     }),
     tool({
       name: "add_customer",
@@ -57,7 +62,7 @@ function buildTools(toolCalls) {
         email: z.string().optional(),
         phone: z.string().optional(),
       }),
-      run: (input) => customers.createCustomer(input),
+      run: (input) => customers.createCustomer(userId, input),
     }),
     tool({
       name: "update_customer",
@@ -68,13 +73,13 @@ function buildTools(toolCalls) {
         email: z.string().optional(),
         phone: z.string().optional(),
       }),
-      run: ({ customer_id, ...fields }) => customers.updateCustomer(customer_id, fields),
+      run: ({ customer_id, ...fields }) => customers.updateCustomer(userId, customer_id, fields),
     }),
     tool({
       name: "delete_customer",
       description: "Permanently delete a customer by customer_id. Only call this when the user clearly asked to delete that specific customer.",
       inputSchema: z.object({ customer_id: z.number().int().positive() }),
-      run: ({ customer_id }) => customers.deleteCustomer(customer_id),
+      run: ({ customer_id }) => customers.deleteCustomer(userId, customer_id),
     }),
   ];
 }
@@ -83,21 +88,24 @@ function buildTools(toolCalls) {
  * Run one chat turn.
  * @param {string} message - the new user message
  * @param {{role: "user"|"assistant", content: string}[]} history - earlier text turns
+ * @param {{user_id: number}} authUser - the authenticated user (from the token)
  */
-export async function chat(message, history = []) {
+export async function chat(message, history, authUser) {
   const toolCalls = [];
+  // Read the name from the database rather than trusting anything else in the request
+  const user = (await getUserById(authUser.user_id)) ?? { name: "unknown" };
   const messages = [...history, { role: "user", content: message }];
 
   const finalMessage = await client.beta.messages.toolRunner({
     model: MODEL,
     max_tokens: 16000,
-    system: SYSTEM_PROMPT,
+    system: systemPrompt(user),
     thinking: { type: "adaptive" },
     output_config: { effort: "medium" },
     // Server-side fallback: if the model declines, the API retries on a fallback model
     betas: ["server-side-fallback-2026-07-01"],
     fallbacks: "default",
-    tools: buildTools(toolCalls),
+    tools: buildTools(toolCalls, authUser.user_id),
     messages,
     max_iterations: 10,
   });

@@ -7,35 +7,50 @@ Two projects that run on separate ports:
 | `backend/` | Node.js, Express, PostgreSQL (`pg`), Swagger UI, Anthropic SDK | 4000 |
 | `frontend/` | React + Vite | 5173 |
 
-The backend allows cross-origin requests (CORS). The frontend calls it over REST. No authentication is required.
+The backend allows cross-origin requests (CORS). The frontend calls it over REST.
+
+Users register and sign in. Every customer belongs to one sales person (`customer.sales_user_id`), and each user can only see and change their own customers, through the REST API, the UI and the AI agent. Another user's customer returns `404`, the same as one that does not exist.
 
 ## Backend
 
 ```bash
 cd backend
 npm install
-# edit .env and set ANTHROPIC_API_KEY=sk-ant-...
+# edit .env: set DATABASE_URL, ANTHROPIC_API_KEY and JWT_SECRET (openssl rand -hex 32)
+npm run migrate    # creates app_user and customer.sales_user_id if missing (idempotent)
 npm run dev        # or: npm start
 ```
 
 - Swagger UI: http://localhost:4000/swagger (raw spec at `/swagger.json`)
-- Configuration is in `backend/.env`: `PORT`, `DATABASE_URL`, `CORS_ORIGIN` (comma-separated origins or `*`), `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL` (default `claude-opus-5-5`)
+- Configuration is in `backend/.env`: `PORT`, `DATABASE_URL`, `CORS_ORIGIN` (comma-separated origins or `*`), `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL` (default `claude-opus-5-5`), `JWT_SECRET` (required), `JWT_EXPIRES_IN` (default `8h`)
 
 ### Endpoints
 
+All customer and agent endpoints need an `Authorization: Bearer <token>` header and return `401` without a valid one.
+
 | Method | Path | Description |
 |---|---|---|
-| GET | `/api/customers` | All customers (`?name=ali` filters by partial name) |
-| GET | `/api/customers/{id}` | One customer |
-| POST | `/api/customers` | Create (`name` required; `email` and `phone` optional) |
+| POST | `/api/auth/register` | Register `{ name, email, password }` (password at least 8 characters). New users always get the role `sales`. Returns `{ token, user }`. |
+| POST | `/api/auth/login` | Log in with `{ email, password }`. Returns `{ token, user }`. |
+| GET | `/api/auth/me` | The logged-in user |
+| GET | `/api/customers` | Your customers (`?name=ali` filters by partial name) |
+| GET | `/api/customers/{id}` | One of your customers |
+| POST | `/api/customers` | Create a customer owned by you (`name` required; `email` and `phone` optional). `409` if the email is already used by any customer. |
 | PUT | `/api/customers/{id}` | Update the fields you send |
 | DELETE | `/api/customers/{id}` | Delete |
 | POST | `/api/agent/chat` | Ask a question in natural language: `{ "message": "Get all customers", "history": [] }` |
 | GET | `/api/health` | Health check, including the database connection |
 
+### Testing auth in Swagger
+
+1. Call `POST /api/auth/register` (or `login`) and copy the `token`.
+2. Click **Authorize** and paste the token.
+3. Call the customer and agent endpoints.
+4. Register a second user, authorize as them, and try to read, update or delete the first user's customers: each call returns `404`.
+
 ### Agent
 
-`POST /api/agent/chat` sends the question to Claude through the Anthropic SDK's tool runner. Claude can use these tools against the `customer` table:
+`POST /api/agent/chat` sends the question to Claude through the Anthropic SDK's tool runner. Claude can use these tools, which only reach the logged-in user's customers:
 
 `get_all_customers`, `get_customer_by_name`, `get_customer_by_id`, `add_customer`, `update_customer`, `delete_customer`
 
@@ -51,6 +66,7 @@ npm run dev        # http://localhost:5173
 
 The backend URL is set with `VITE_API_URL` in `frontend/.env` (default `http://localhost:4000`).
 
+- **Sign in**: a sign-in and registration screen is shown until you log in. The header shows your name and a **Log out** button. An expired session returns you to the sign-in screen.
 - **Layout**: top header bar with API status and a Swagger link, the full-width customer page, and a floating chat button in the bottom-right corner
 - **Customers**: table with search, totals, and add, edit and delete dialogs
 - **AI Assistant** (chat button): chat panel with suggested prompts. Answers render as Markdown and show which tools ran. The customer table refreshes when the assistant changes data. Closing the panel keeps the conversation.

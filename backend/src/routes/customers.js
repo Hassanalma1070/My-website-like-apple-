@@ -1,7 +1,9 @@
 import { Router } from "express";
 import * as customers from "../customers.js";
+import { requireAuth } from "../auth.js";
 
 const router = Router();
+router.use(requireAuth);
 
 function parseId(req, res) {
   const id = Number.parseInt(req.params.id, 10);
@@ -27,7 +29,7 @@ function validateBody(body, { requireName }) {
 router.get("/", async (req, res, next) => {
   try {
     const { name } = req.query;
-    res.json(name ? await customers.findCustomersByName(String(name)) : await customers.listCustomers());
+    res.json(name ? await customers.findCustomersByName(req.user.user_id, String(name)) : await customers.listCustomers(req.user.user_id));
   } catch (err) {
     next(err);
   }
@@ -37,7 +39,7 @@ router.get("/:id", async (req, res, next) => {
   try {
     const id = parseId(req, res);
     if (id === null) return;
-    const customer = await customers.getCustomerById(id);
+    const customer = await customers.getCustomerById(req.user.user_id, id);
     if (!customer) return res.status(404).json({ error: "Customer not found" });
     res.json(customer);
   } catch (err) {
@@ -49,8 +51,9 @@ router.post("/", async (req, res, next) => {
   try {
     const error = validateBody(req.body, { requireName: true });
     if (error) return res.status(400).json({ error });
-    res.status(201).json(await customers.createCustomer(req.body));
+    res.status(201).json(await customers.createCustomer(req.user.user_id, req.body));
   } catch (err) {
+    if (err instanceof customers.DuplicateCustomerEmailError) return res.status(409).json({ error: err.message });
     next(err);
   }
 });
@@ -61,10 +64,11 @@ router.put("/:id", async (req, res, next) => {
     if (id === null) return;
     const error = validateBody(req.body, { requireName: false });
     if (error) return res.status(400).json({ error });
-    const customer = await customers.updateCustomer(id, req.body);
+    const customer = await customers.updateCustomer(req.user.user_id, id, req.body);
     if (!customer) return res.status(404).json({ error: "Customer not found" });
     res.json(customer);
   } catch (err) {
+    if (err instanceof customers.DuplicateCustomerEmailError) return res.status(409).json({ error: err.message });
     next(err);
   }
 });
@@ -73,7 +77,7 @@ router.delete("/:id", async (req, res, next) => {
   try {
     const id = parseId(req, res);
     if (id === null) return;
-    const customer = await customers.deleteCustomer(id);
+    const customer = await customers.deleteCustomer(req.user.user_id, id);
     if (!customer) return res.status(404).json({ error: "Customer not found" });
     res.json(customer);
   } catch (err) {
